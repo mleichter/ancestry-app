@@ -15,6 +15,14 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
   )
 }
 
+type RelFormData = {
+  person_b_id: string
+  type: RelationshipType
+  start_date: string
+  end_date: string
+  notes: string
+}
+
 export default function PersonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -32,29 +40,26 @@ export default function PersonDetailPage() {
     queryFn: () => relationshipsApi.list(id),
   })
 
-  const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ['persons'] })
+  const invalidateRels = () => {
+    qc.invalidateQueries({ queryKey: ['relationships', id] })
     qc.invalidateQueries({ queryKey: ['tree'] })
   }
 
   const deletePersonMutation = useMutation({
     mutationFn: () => personsApi.delete(id!),
-    onSuccess: () => { invalidateAll(); navigate('/persons') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['persons'] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+      navigate('/persons')
+    },
   })
   const addRelMutation = useMutation({
     mutationFn: (data: RelationshipCreate) => relationshipsApi.create(data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['relationships', id] })
-      qc.invalidateQueries({ queryKey: ['tree'] })
-      setShowRelForm(false)
-    },
+    onSuccess: () => { invalidateRels(); setShowRelForm(false) },
   })
   const deleteRelMutation = useMutation({
     mutationFn: (relId: string) => relationshipsApi.delete(relId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['relationships', id] })
-      qc.invalidateQueries({ queryKey: ['tree'] })
-    },
+    onSuccess: invalidateRels,
   })
   const uploadAvatarMutation = useMutation({
     mutationFn: (file: File) => mediaApi.uploadAvatar(id!, file),
@@ -64,7 +69,10 @@ export default function PersonDetailPage() {
     },
   })
 
-  const { register, handleSubmit, reset } = useForm<{ person_b_id: string; type: RelationshipType }>()
+  const { register, handleSubmit, reset, watch } = useForm<RelFormData>({
+    defaultValues: { person_b_id: '', type: '' as RelationshipType, start_date: '', end_date: '', notes: '' },
+  })
+  const relType = watch('type')
 
   if (isLoading) return <div className="text-center py-12 text-gray-500">Lade...</div>
   if (!person) return <div className="text-center py-12 text-red-500">Person nicht gefunden</div>
@@ -72,38 +80,42 @@ export default function PersonDetailPage() {
   const otherPersons = allPersons.filter(p => p.id !== id)
   const personById = Object.fromEntries(allPersons.map(p => [p.id, p]))
 
+  const onAddRel = (data: RelFormData) => {
+    const payload: RelationshipCreate = {
+      person_a_id: id!,
+      person_b_id: data.person_b_id,
+      type: data.type,
+      ...(data.start_date && { start_date: data.start_date }),
+      ...(data.end_date && { end_date: data.end_date }),
+      ...(data.notes && { notes: data.notes }),
+    }
+    addRelMutation.mutate(payload)
+  }
+
+  const inp = 'border border-gray-300 rounded px-2 py-1.5 text-sm w-full'
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4">
         <div className="flex items-center gap-4">
-          {/* Avatar */}
           <div className="relative group">
             {person.avatar_media_id ? (
-              <img
-                src={mediaApi.fileUrl(person.avatar_media_id)}
+              <img src={mediaApi.fileUrl(person.avatar_media_id)}
                 alt={`${person.first_name} ${person.last_name}`}
-                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow"
-              />
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-2xl">
+              <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xl font-medium">
                 {person.first_name[0]}{person.last_name[0]}
               </div>
             )}
-            <button
-              onClick={() => fileInputRef.current?.click()}
+            <button onClick={() => fileInputRef.current?.click()}
               className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs"
-              title="Foto hochladen"
-            >
-              {uploadAvatarMutation.isPending ? '...' : '📷'}
+              title="Foto hochladen">
+              {uploadAvatarMutation.isPending ? '…' : '📷'}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatarMutation.mutate(f) }}
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatarMutation.mutate(f) }} />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-800">{person.first_name} {person.last_name}</h1>
@@ -111,15 +123,9 @@ export default function PersonDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link to={`/persons/${id}/edit`} className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 text-sm">
-            Bearbeiten
-          </Link>
-          <button
-            onClick={() => { if (confirm('Person löschen?')) deletePersonMutation.mutate() }}
-            className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm"
-          >
-            Löschen
-          </button>
+          <Link to={`/persons/${id}/edit`} className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 text-sm">Bearbeiten</Link>
+          <button onClick={() => { if (confirm('Person löschen?')) deletePersonMutation.mutate() }}
+            className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm">Löschen</button>
         </div>
       </div>
 
@@ -145,71 +151,90 @@ export default function PersonDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold text-gray-700">Beziehungen</h2>
-          <button onClick={() => setShowRelForm(!showRelForm)} className="text-sm text-indigo-600 hover:underline">
+          <button onClick={() => setShowRelForm(v => !v)} className="text-sm text-indigo-600 hover:underline">
             + Beziehung hinzufügen
           </button>
         </div>
 
         {showRelForm && (
-          <form
-            onSubmit={handleSubmit(data => addRelMutation.mutate({ ...data, person_a_id: id! }))}
-            className="bg-indigo-50 rounded-lg p-4 mb-4 flex gap-3 flex-wrap items-end"
-          >
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Person</label>
-              <select {...register('person_b_id', { required: true })}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                <option value="">– wählen –</option>
-                {otherPersons.map(p => (
-                  <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
-                ))}
-              </select>
+          <form onSubmit={handleSubmit(onAddRel)}
+            className="bg-indigo-50 rounded-lg p-4 mb-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Person *</label>
+                <select {...register('person_b_id', { required: true })} className={inp}>
+                  <option value="">– wählen –</option>
+                  {otherPersons.map(p => (
+                    <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Art *</label>
+                <select {...register('type', { required: true })} className={inp}>
+                  <option value="">– wählen –</option>
+                  <option value="parent_child">Diese Person ist Elternteil</option>
+                  <option value="partner">Partner</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Art</label>
-              <select {...register('type', { required: true })}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                <option value="">– wählen –</option>
-                <option value="parent_child">Diese Person ist Elternteil</option>
-                <option value="partner">Partner</option>
-              </select>
+            {relType === 'partner' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Beginn (z.B. Hochzeit)</label>
+                    <input {...register('start_date')} placeholder="JJJJ-MM-TT" className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Ende</label>
+                    <input {...register('end_date')} placeholder="JJJJ-MM-TT" className={inp} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Notizen</label>
+                  <input {...register('notes')} placeholder="z.B. verheiratet in München" className={inp} />
+                </div>
+              </>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button type="submit" disabled={addRelMutation.isPending}
+                className="bg-indigo-600 text-white px-4 py-1.5 rounded text-sm hover:bg-indigo-700 disabled:opacity-50">
+                Hinzufügen
+              </button>
+              <button type="button" onClick={() => { setShowRelForm(false); reset() }}
+                className="text-sm text-gray-500 hover:text-gray-700 px-2">
+                Abbrechen
+              </button>
             </div>
-            <button type="submit" disabled={addRelMutation.isPending}
-              className="bg-indigo-600 text-white px-4 py-1.5 rounded text-sm hover:bg-indigo-700 disabled:opacity-50">
-              Hinzufügen
-            </button>
-            <button type="button" onClick={() => { setShowRelForm(false); reset() }}
-              className="text-sm text-gray-500 hover:text-gray-700">
-              Abbrechen
-            </button>
           </form>
         )}
 
         {rels.length === 0 ? (
           <p className="text-sm text-gray-400">Keine Beziehungen vorhanden.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {rels.map(rel => {
               const otherId = rel.person_a_id === id ? rel.person_b_id : rel.person_a_id
               const other = personById[otherId]
               const isParent = rel.type === 'parent_child'
               const isA = rel.person_a_id === id
+              const dateRange = [rel.start_date, rel.end_date].filter(Boolean).join(' – ')
               return (
-                <div key={rel.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isParent ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                <div key={rel.id} className="flex items-start justify-between py-2.5 border-b border-gray-100 last:border-0">
+                  <div className="flex items-start gap-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 shrink-0 ${isParent ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
                       {isParent ? (isA ? 'Elternteil von' : 'Kind von') : 'Partner von'}
                     </span>
-                    <Link to={`/persons/${otherId}`} className="text-sm font-medium text-gray-700 hover:text-indigo-600">
-                      {other ? `${other.first_name} ${other.last_name}` : otherId}
-                    </Link>
+                    <div>
+                      <Link to={`/persons/${otherId}`} className="text-sm font-medium text-gray-700 hover:text-indigo-600">
+                        {other ? `${other.first_name} ${other.last_name}` : otherId}
+                      </Link>
+                      {dateRange && <p className="text-xs text-gray-400 mt-0.5">{dateRange}</p>}
+                      {rel.notes && <p className="text-xs text-gray-500 mt-0.5 italic">{rel.notes}</p>}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => deleteRelMutation.mutate(rel.id)}
-                    className="text-xs text-red-400 hover:text-red-600 px-2"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => deleteRelMutation.mutate(rel.id)}
+                    className="text-xs text-red-400 hover:text-red-600 px-2 mt-0.5 shrink-0">✕</button>
                 </div>
               )
             })}
