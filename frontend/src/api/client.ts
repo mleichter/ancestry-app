@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Person, PersonCreate, Relationship, RelationshipCreate, TreeData } from '../types'
+import type { Person, PersonCreate, Relationship, RelationshipCreate, TreeData, MediaItem, GedcomImportResult } from '../types'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -31,5 +31,24 @@ export const mediaApi = {
     form.append('file', file)
     return api.post(`/persons/${personId}/media/avatar`, form).then(r => r.data)
   },
+  uploadPhoto: (personId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/persons/${personId}/media`, form).then(r => r.data)
+  },
+  listPersonMedia: (personId: string) =>
+    api.get<MediaItem[]>(`/persons/${personId}/media`).then(r => r.data),
+  deleteMedia: (mediaId: string) => api.delete(`/media/${mediaId}`),
+  setAvatar: (personId: string, mediaId: string) =>
+    api.patch(`/persons/${personId}/avatar/${mediaId}`).then(r => r.data),
   fileUrl: (mediaId: string) => `/api/v1/media/${mediaId}/file`,
+}
+
+export const gedcomApi = {
+  exportUrl: () => '/api/v1/gedcom/export',
+  import: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post<GedcomImportResult>('/gedcom/import', form).then(r => r.data)
+  },
 }

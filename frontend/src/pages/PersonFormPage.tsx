@@ -73,8 +73,8 @@ export default function PersonFormPage() {
 
   const onSubmit = (data: FormData) => {
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== '' && v !== undefined))
-    if (isEdit) updateMutation.mutate(clean)
-    else createMutation.mutate(clean as PersonCreate)
+    if (isEdit) updateMutation.mutate(clean as Partial<PersonCreate>)
+    else createMutation.mutate(clean as unknown as PersonCreate)
   }
 
   const input = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none'

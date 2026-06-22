@@ -3,14 +3,28 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { personsApi, relationshipsApi, mediaApi } from '../api/client'
-import type { RelationshipCreate, RelationshipType } from '../types'
+import type { RelationshipCreate, RelationshipType, MediaItem } from '../types'
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
+function MapsLink({ place }: { place: string }) {
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      className="ml-2 text-xs text-indigo-500 dark:text-indigo-400 hover:underline shrink-0"
+      title="Auf Google Maps anzeigen">
+      📍 Karte
+    </a>
+  )
+}
+
+function InfoRow({ label, value, withMap }: { label: string; value?: string | null; withMap?: boolean }) {
   if (!value) return null
   return (
     <div className="flex gap-4 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
       <span className="text-gray-500 dark:text-gray-400 w-40 shrink-0 text-sm">{label}</span>
-      <span className="text-gray-800 dark:text-gray-200 text-sm">{value}</span>
+      <span className="text-gray-800 dark:text-gray-200 text-sm flex items-center gap-1 flex-wrap">
+        {value}
+        {withMap && <MapsLink place={value} />}
+      </span>
     </div>
   )
 }
@@ -21,6 +35,125 @@ type RelFormData = {
   start_date: string
   end_date: string
   notes: string
+}
+
+function PhotoGallery({ personId }: { personId: string }) {
+  const qc = useQueryClient()
+  const photoRef = useRef<HTMLInputElement>(null)
+  const [lightbox, setLightbox] = useState<MediaItem | null>(null)
+
+  const { data: media = [] } = useQuery({
+    queryKey: ['media', personId],
+    queryFn: () => mediaApi.listPersonMedia(personId),
+  })
+
+  const { data: person } = useQuery({
+    queryKey: ['persons', personId],
+    queryFn: () => personsApi.get(personId),
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => mediaApi.uploadPhoto(personId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['media', personId] }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.deleteMedia(mediaId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['media', personId] })
+      qc.invalidateQueries({ queryKey: ['persons', personId] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+      setLightbox(null)
+    },
+  })
+
+  const setAvatarMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.setAvatar(personId, mediaId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['persons', personId] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+    },
+  })
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="font-semibold text-gray-700 dark:text-gray-300">Fotos ({media.length})</h2>
+        <button
+          onClick={() => photoRef.current?.click()}
+          disabled={uploadMutation.isPending}
+          className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
+        >
+          {uploadMutation.isPending ? 'Hochladen…' : '+ Foto hinzufügen'}
+        </button>
+        <input ref={photoRef} type="file" accept="image/*" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate(f); e.target.value = '' }} />
+      </div>
+
+      {media.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500">Noch keine Fotos vorhanden.</p>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {media.map(m => (
+            <div key={m.id} className="relative group aspect-square cursor-pointer"
+              onClick={() => setLightbox(m)}>
+              <img
+                src={mediaApi.fileUrl(m.id)}
+                alt={m.file_name}
+                className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+              />
+              {person?.avatar_media_id === m.id && (
+                <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[9px] px-1 py-0.5 rounded font-medium">
+                  Avatar
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-2xl max-w-2xl w-full"
+            onClick={e => e.stopPropagation()}>
+            <img
+              src={mediaApi.fileUrl(lightbox.id)}
+              alt={lightbox.file_name}
+              className="w-full object-contain max-h-[70vh]"
+            />
+            <div className="p-4 flex items-center justify-between gap-3">
+              <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{lightbox.file_name}</span>
+              <div className="flex gap-2 shrink-0">
+                {person?.avatar_media_id !== lightbox.id && (
+                  <button
+                    onClick={() => setAvatarMutation.mutate(lightbox.id)}
+                    disabled={setAvatarMutation.isPending}
+                    className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    Als Avatar
+                  </button>
+                )}
+                <button
+                  onClick={() => { if (confirm('Foto löschen?')) deleteMutation.mutate(lightbox.id) }}
+                  className="px-3 py-1.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50"
+                >
+                  Löschen
+                </button>
+                <button onClick={() => setLightbox(null)}
+                  className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg">
+                  Schließen
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function PersonDetailPage() {
@@ -65,6 +198,7 @@ export default function PersonDetailPage() {
     mutationFn: (file: File) => mediaApi.uploadAvatar(id!, file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['persons', id] })
+      qc.invalidateQueries({ queryKey: ['media', id] })
       qc.invalidateQueries({ queryKey: ['tree'] })
     },
   })
@@ -95,9 +229,9 @@ export default function PersonDetailPage() {
   const inp = 'border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500'
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-4">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="relative group">
             {person.avatar_media_id ? (
@@ -135,13 +269,13 @@ export default function PersonDetailPage() {
       </div>
 
       {/* Details */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm mb-6">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
         <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Personendaten</h2>
         <InfoRow label="Geschlecht" value={person.gender} />
         <InfoRow label="Geburtsdatum" value={person.date_of_birth} />
-        <InfoRow label="Geburtsort" value={person.place_of_birth} />
+        <InfoRow label="Geburtsort" value={person.place_of_birth} withMap />
         <InfoRow label="Sterbedatum" value={person.date_of_death} />
-        <InfoRow label="Sterbeort" value={person.place_of_death} />
+        <InfoRow label="Sterbeort" value={person.place_of_death} withMap />
         <InfoRow label="Nationalität" value={person.nationality} />
         <InfoRow label="Herkunft" value={person.origin} />
         {person.biography && (
@@ -151,6 +285,9 @@ export default function PersonDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Photo Gallery */}
+      <PhotoGallery personId={id!} />
 
       {/* Relationships */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">

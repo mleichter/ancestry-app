@@ -3,6 +3,7 @@ import uuid
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.media import Media, MediaType
@@ -83,3 +84,98 @@ async def get_media_file(media_id: UUID, db: AsyncSession = Depends(get_db)):
     if not os.path.exists(abs_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     return FileResponse(abs_path, media_type=media.mime_type)
+
+
+@router.get("/persons/{person_id}/media")
+async def list_person_media(person_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Media).where(Media.person_id == person_id).order_by(Media.uploaded_at.desc())
+    )
+    items = result.scalars().all()
+    return [
+        {
+            "id": str(m.id),
+            "person_id": str(m.person_id),
+            "file_name": m.file_name,
+            "media_type": m.media_type.value,
+            "mime_type": m.mime_type,
+            "uploaded_at": m.uploaded_at.isoformat() if m.uploaded_at else None,
+        }
+        for m in items
+    ]
+
+
+@router.post("/persons/{person_id}/media", status_code=201)
+async def upload_photo(
+    person_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    person = await db.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    settings = get_settings()
+    ext = EXT_BY_MIME.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
+
+    content = await file.read()
+    if len(content) > settings.max_upload_size_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
+
+    media_id = uuid.uuid4()
+    rel_path = f"{person_id}/{media_id}.{ext}"
+    abs_path = _safe_media_path(settings.media_storage_path, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    with open(abs_path, "wb") as fh:
+        fh.write(content)
+
+    media = Media(
+        id=media_id,
+        person_id=person_id,
+        file_name=f"{media_id}.{ext}",
+        file_path=rel_path,
+        media_type=MediaType.photo,
+        mime_type=file.content_type,
+    )
+    db.add(media)
+    await db.commit()
+    await db.refresh(media)
+    return {"id": str(media.id), "person_id": str(person_id)}
+
+
+@router.delete("/media/{media_id}", status_code=204)
+async def delete_media(media_id: UUID, db: AsyncSession = Depends(get_db)):
+    media = await db.get(Media, media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    person = await db.get(Person, media.person_id)
+    if person and person.avatar_media_id == media_id:
+        person.avatar_media_id = None
+
+    settings = get_settings()
+    try:
+        abs_path = _safe_media_path(settings.media_storage_path, media.file_path)
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+    except Exception:
+        pass
+
+    await db.delete(media)
+    await db.commit()
+
+
+@router.patch("/persons/{person_id}/avatar/{media_id}")
+async def set_avatar(person_id: UUID, media_id: UUID, db: AsyncSession = Depends(get_db)):
+    person = await db.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    media = await db.get(Media, media_id)
+    if not media or media.person_id != person_id:
+        raise HTTPException(status_code=404, detail="Media not found for this person")
+    person.avatar_media_id = media_id
+    await db.commit()
+    return {"id": str(media_id)}

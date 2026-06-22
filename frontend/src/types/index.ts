@@ -83,3 +83,17 @@ export interface TreeData {
   nodes: TreeNode[]
   edges: TreeEdge[]
 }
+
+export interface MediaItem {
+  id: string
+  person_id: string
+  file_name: string
+  media_type: string
+  mime_type: string
+  uploaded_at: string
+}
+
+export interface GedcomImportResult {
+  persons_created: number
+  relationships_created: number
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -18,18 +18,13 @@ import 'reactflow/dist/style.css'
 import { treeApi, mediaApi } from '../api/client'
 import type { TreeNode, TreeEdge } from '../types'
 
-// Colors via CSS variables — auto-switch with prefers-color-scheme (see index.css)
 const GENDER_VARS: Record<string, string> = {
   male: 'male', female: 'female', other: 'other', unknown: 'unknown',
 }
 function nodeVars(gender?: string) {
   const g = GENDER_VARS[gender ?? 'unknown'] ?? 'unknown'
-  return {
-    bg:     `var(--node-${g}-bg)`,
-    border: `var(--node-${g}-border)`,
-  }
+  return { bg: `var(--node-${g}-bg)`, border: `var(--node-${g}-border)` }
 }
-// Static light-mode values used only for MiniMap (JS can't read CSS vars directly)
 const MINIMAP_COLORS_LIGHT: Record<string, string> = {
   male: '#dbeafe', female: '#fce7f3', other: '#e0e7ff', unknown: '#f3f4f6',
 }
@@ -70,12 +65,57 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
 
 const nodeTypes = { person: PersonNode }
 
-// ─── layout ──────────────────────────────────────────────────────────────────
+// ─── Branch filter helpers ────────────────────────────────────────────────────
+
+function getAncestors(personId: string, edges: TreeEdge[]): Set<string> {
+  const result = new Set<string>()
+  const queue = [personId]
+  while (queue.length) {
+    const id = queue.shift()!
+    if (result.has(id)) continue
+    result.add(id)
+    edges.filter(e => e.type === 'parent_child' && e.target === id).forEach(e => queue.push(e.source))
+  }
+  return result
+}
+
+function getDescendants(personId: string, edges: TreeEdge[]): Set<string> {
+  const result = new Set<string>()
+  const queue = [personId]
+  while (queue.length) {
+    const id = queue.shift()!
+    if (result.has(id)) continue
+    result.add(id)
+    edges.filter(e => e.type === 'parent_child' && e.source === id).forEach(e => queue.push(e.target))
+  }
+  return result
+}
+
+function applyFilter(
+  nodes: TreeNode[],
+  edges: TreeEdge[],
+  mode: 'all' | 'ancestors' | 'descendants',
+  focusId: string | null,
+): { nodes: TreeNode[]; edges: TreeEdge[] } {
+  if (mode === 'all' || !focusId) return { nodes, edges }
+  const primary = mode === 'ancestors' ? getAncestors(focusId, edges) : getDescendants(focusId, edges)
+  // Include partners of found persons for context
+  edges.filter(e => e.type === 'partner').forEach(e => {
+    if (primary.has(e.source)) primary.add(e.target)
+    if (primary.has(e.target)) primary.add(e.source)
+  })
+  return {
+    nodes: nodes.filter(n => primary.has(n.id)),
+    edges: edges.filter(e => primary.has(e.source) && primary.has(e.target)),
+  }
+}
+
+// ─── Layout ──────────────────────────────────────────────────────────────────
 
 const NODE_W = 170
 const NODE_H = 80
-const H_GAP  = 50   // gap between siblings / unrelated nodes
-const COUPLE_GAP = 30  // tighter gap between partners
+const H_GAP  = 50
+const COUPLE_GAP = 30
 const V_GAP  = 90
 
 function buildLayout(
@@ -83,11 +123,9 @@ function buildLayout(
   treeEdges: TreeEdge[],
   onNavigate: (path: string) => void,
 ): { nodes: Node[]; edges: Edge[] } {
-
-  // ── relationship maps ──────────────────────────────────────────────────────
-  const childrenOf  = new Map<string, Set<string>>()  // parent  → children
-  const parentsOf   = new Map<string, Set<string>>()  // child   → parents
-  const partnersOf  = new Map<string, Set<string>>()  // person  → partners
+  const childrenOf  = new Map<string, Set<string>>()
+  const parentsOf   = new Map<string, Set<string>>()
+  const partnersOf  = new Map<string, Set<string>>()
 
   for (const e of treeEdges) {
     if (e.type === 'parent_child') {
@@ -103,7 +141,6 @@ function buildLayout(
     }
   }
 
-  // ── BFS level assignment ───────────────────────────────────────────────────
   const level = new Map<string, number>()
   const roots = treeNodes.filter(n => !parentsOf.has(n.id) || parentsOf.get(n.id)!.size === 0)
   const queue: Array<{ id: string; lvl: number }> = roots.map(n => ({ id: n.id, lvl: 0 }))
@@ -117,7 +154,6 @@ function buildLayout(
   }
   treeNodes.forEach(n => { if (!level.has(n.id)) level.set(n.id, 0) })
 
-  // ── within each level, order nodes: partners adjacent ─────────────────────
   const byLevel = new Map<number, string[]>()
   level.forEach((lvl, id) => {
     if (!byLevel.has(lvl)) byLevel.set(lvl, [])
@@ -132,7 +168,6 @@ function buildLayout(
       if (placed.has(id)) continue
       order.push(id)
       placed.add(id)
-      // Place all partners of this node right after it
       partnersOf.get(id)?.forEach(pid => {
         if (level.get(pid) === lvl && !placed.has(pid)) {
           order.push(pid)
@@ -143,11 +178,8 @@ function buildLayout(
     orderedByLevel.set(lvl, order)
   })
 
-  // ── assign x positions with tighter gaps for adjacent partners ────────────
   const pos = new Map<string, { x: number; y: number }>()
-
   orderedByLevel.forEach((ids, lvl) => {
-    // Pre-compute total width to centre around 0
     const gaps: number[] = ids.map((id, i) => {
       if (i === 0) return 0
       const prev = ids[i - 1]
@@ -162,13 +194,9 @@ function buildLayout(
     })
   })
 
-  // ── nudge children toward their parents' midpoint ─────────────────────────
-  // For each child, if all its parents are known, shift it toward their x midpoint.
-  // Do this level-by-level top-down to avoid cascading distortion.
   const maxLevel = Math.max(...[...level.values()])
   for (let lvl = 1; lvl <= maxLevel; lvl++) {
     const ids = orderedByLevel.get(lvl) ?? []
-    // Build ideal-x for each id based on parents' current positions
     const idealX = new Map<string, number>()
     for (const id of ids) {
       const pids = [...(parentsOf.get(id) ?? [])]
@@ -177,7 +205,6 @@ function buildLayout(
       idealX.set(id, parentXs.reduce((s, x) => s + x, 0) / parentXs.length)
     }
     if (idealX.size === 0) continue
-    // Shift all nodes in the level by the average delta, preserving relative order
     const deltas = [...idealX.values()]
     const avgDelta = deltas.reduce((s, d) => s + d, 0) / deltas.length
     const currentCentroid = ids.reduce((s, id) => s + (pos.get(id)?.x ?? 0), 0) / ids.length
@@ -188,7 +215,6 @@ function buildLayout(
     })
   }
 
-  // ── build React Flow nodes ─────────────────────────────────────────────────
   const nodes: Node[] = treeNodes.map(n => ({
     id: n.id,
     type: 'person',
@@ -196,7 +222,6 @@ function buildLayout(
     data: { ...n, onClick: () => onNavigate(`/persons/${n.id}`) },
   }))
 
-  // ── build React Flow edges ─────────────────────────────────────────────────
   const edges: Edge[] = treeEdges.map(e => {
     if (e.type === 'partner') {
       const srcX = pos.get(e.source)?.x ?? 0
@@ -227,21 +252,31 @@ function buildLayout(
   return { nodes, edges }
 }
 
-// ─── page ─────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+type FilterMode = 'all' | 'ancestors' | 'descendants'
 
 export default function TreePage() {
   const dark = useDarkMode()
   const { data, isLoading } = useQuery({ queryKey: ['tree'], queryFn: treeApi.get })
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [filterMode, setFilterMode] = useState<FilterMode>('all')
+  const [focusId, setFocusId] = useState<string>('')
   const onNavigate = useCallback((path: string) => { window.location.href = path }, [])
+
+  const sortedPersons = useMemo(() => {
+    if (!data) return []
+    return [...data.nodes].sort((a, b) => a.label.localeCompare(b.label))
+  }, [data])
 
   useEffect(() => {
     if (!data) return
-    const { nodes: n, edges: e } = buildLayout(data.nodes, data.edges, onNavigate)
+    const { nodes: tn, edges: te } = applyFilter(data.nodes, data.edges, filterMode, focusId || null)
+    const { nodes: n, edges: e } = buildLayout(tn, te, onNavigate)
     setNodes(n)
     setEdges(e)
-  }, [data, onNavigate, setNodes, setEdges])
+  }, [data, filterMode, focusId, onNavigate, setNodes, setEdges])
 
   if (isLoading) return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Lade Stammbaum…</div>
 
@@ -257,22 +292,59 @@ export default function TreePage() {
   const minimapColors = dark ? MINIMAP_COLORS_DARK : MINIMAP_COLORS_LIGHT
 
   return (
-    <div style={{ height: 'calc(100vh - 120px)' }}
-      className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.2}
-      >
-        <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
-        <Controls />
-        <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
-      </ReactFlow>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Anzeigen:</span>
+        {(['all', 'ancestors', 'descendants'] as FilterMode[]).map(mode => (
+          <button
+            key={mode}
+            onClick={() => { setFilterMode(mode); if (mode === 'all') setFocusId('') }}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              filterMode === mode
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {mode === 'all' ? 'Alle' : mode === 'ancestors' ? 'Vorfahren von' : 'Nachkommen von'}
+          </button>
+        ))}
+        {filterMode !== 'all' && (
+          <select
+            value={focusId}
+            onChange={e => setFocusId(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <option value="">– Person wählen –</option>
+            {sortedPersons.map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        )}
+        {filterMode !== 'all' && focusId && (
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {nodes.length} Person{nodes.length !== 1 ? 'en' : ''} sichtbar
+          </span>
+        )}
+      </div>
+
+      {/* Tree canvas */}
+      <div className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          minZoom={0.2}
+        >
+          <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
+          <Controls />
+          <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
+        </ReactFlow>
+      </div>
     </div>
   )
 }
