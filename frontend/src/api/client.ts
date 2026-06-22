@@ -24,3 +24,12 @@ export const relationshipsApi = {
 export const treeApi = {
   get: () => api.get<TreeData>('/tree').then(r => r.data),
 }
+
+export const mediaApi = {
+  uploadAvatar: (personId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/persons/${personId}/media/avatar`, form).then(r => r.data)
+  },
+  fileUrl: (mediaId: string) => `/api/v1/media/${mediaId}/file`,
+}

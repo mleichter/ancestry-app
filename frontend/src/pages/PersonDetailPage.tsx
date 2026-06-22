@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { personsApi, relationshipsApi } from '../api/client'
+import { personsApi, relationshipsApi, mediaApi } from '../api/client'
 import type { RelationshipCreate, RelationshipType } from '../types'
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
@@ -20,6 +20,7 @@ export default function PersonDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [showRelForm, setShowRelForm] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: person, isLoading } = useQuery({
     queryKey: ['persons', id],
@@ -31,17 +32,36 @@ export default function PersonDetailPage() {
     queryFn: () => relationshipsApi.list(id),
   })
 
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['persons'] })
+    qc.invalidateQueries({ queryKey: ['tree'] })
+  }
+
   const deletePersonMutation = useMutation({
     mutationFn: () => personsApi.delete(id!),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate('/persons') },
+    onSuccess: () => { invalidateAll(); navigate('/persons') },
   })
   const addRelMutation = useMutation({
     mutationFn: (data: RelationshipCreate) => relationshipsApi.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['relationships', id] }); setShowRelForm(false) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['relationships', id] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+      setShowRelForm(false)
+    },
   })
   const deleteRelMutation = useMutation({
     mutationFn: (relId: string) => relationshipsApi.delete(relId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['relationships', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['relationships', id] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+    },
+  })
+  const uploadAvatarMutation = useMutation({
+    mutationFn: (file: File) => mediaApi.uploadAvatar(id!, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['persons', id] })
+      qc.invalidateQueries({ queryKey: ['tree'] })
+    },
   })
 
   const { register, handleSubmit, reset } = useForm<{ person_b_id: string; type: RelationshipType }>()
@@ -50,17 +70,47 @@ export default function PersonDetailPage() {
   if (!person) return <div className="text-center py-12 text-red-500">Person nicht gefunden</div>
 
   const otherPersons = allPersons.filter(p => p.id !== id)
-  const relatedIds = new Set(rels.flatMap(r => [r.person_a_id, r.person_b_id]))
   const personById = Object.fromEntries(allPersons.map(p => [p.id, p]))
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">{person.first_name} {person.last_name}</h1>
-          {person.birth_name && <p className="text-gray-500 text-sm mt-1">geb. {person.birth_name}</p>}
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6 gap-4">
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
+          <div className="relative group">
+            {person.avatar_media_id ? (
+              <img
+                src={mediaApi.fileUrl(person.avatar_media_id)}
+                alt={`${person.first_name} ${person.last_name}`}
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-2xl">
+                {person.first_name[0]}{person.last_name[0]}
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs"
+              title="Foto hochladen"
+            >
+              {uploadAvatarMutation.isPending ? '...' : '📷'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatarMutation.mutate(f) }}
+            />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">{person.first_name} {person.last_name}</h1>
+            {person.birth_name && <p className="text-gray-500 text-sm mt-0.5">geb. {person.birth_name}</p>}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Link to={`/persons/${id}/edit`} className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 text-sm">
             Bearbeiten
           </Link>
@@ -73,6 +123,7 @@ export default function PersonDetailPage() {
         </div>
       </div>
 
+      {/* Details */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
         <h2 className="font-semibold text-gray-700 mb-3">Personendaten</h2>
         <InfoRow label="Geschlecht" value={person.gender} />
@@ -90,6 +141,7 @@ export default function PersonDetailPage() {
         )}
       </div>
 
+      {/* Relationships */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold text-gray-700">Beziehungen</h2>
@@ -118,14 +170,16 @@ export default function PersonDetailPage() {
               <select {...register('type', { required: true })}
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm">
                 <option value="">– wählen –</option>
-                <option value="parent_child">Elternteil → Kind</option>
+                <option value="parent_child">Diese Person ist Elternteil</option>
                 <option value="partner">Partner</option>
               </select>
             </div>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-1.5 rounded text-sm hover:bg-indigo-700">
+            <button type="submit" disabled={addRelMutation.isPending}
+              className="bg-indigo-600 text-white px-4 py-1.5 rounded text-sm hover:bg-indigo-700 disabled:opacity-50">
               Hinzufügen
             </button>
-            <button type="button" onClick={() => { setShowRelForm(false); reset() }} className="text-sm text-gray-500 hover:text-gray-700">
+            <button type="button" onClick={() => { setShowRelForm(false); reset() }}
+              className="text-sm text-gray-500 hover:text-gray-700">
               Abbrechen
             </button>
           </form>
@@ -152,7 +206,7 @@ export default function PersonDetailPage() {
                   </div>
                   <button
                     onClick={() => deleteRelMutation.mutate(rel.id)}
-                    className="text-xs text-red-400 hover:text-red-600"
+                    className="text-xs text-red-400 hover:text-red-600 px-2"
                   >
                     ✕
                   </button>
