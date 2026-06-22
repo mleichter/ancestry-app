@@ -11,7 +11,22 @@ from app.config import get_settings
 
 router = APIRouter(tags=["media"])
 
-ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+# Extension derived from MIME type only — never from user-supplied filename
+EXT_BY_MIME: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
+
+def _safe_media_path(base: str, rel: str) -> str:
+    """Return abs_path and raise if it escapes the media storage root."""
+    abs_path = os.path.realpath(os.path.join(base, rel))
+    base_real = os.path.realpath(base) + os.sep
+    if not abs_path.startswith(base_real):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    return abs_path
 
 
 @router.post("/persons/{person_id}/media/avatar", status_code=201)
@@ -25,7 +40,8 @@ async def upload_avatar(
         raise HTTPException(status_code=404, detail="Person not found")
 
     settings = get_settings()
-    if file.content_type not in ALLOWED_MIME:
+    ext = EXT_BY_MIME.get(file.content_type or "")
+    if not ext:
         raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
 
     content = await file.read()
@@ -33,10 +49,9 @@ async def upload_avatar(
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
 
-    ext = (file.filename or "photo").rsplit(".", 1)[-1].lower()
     media_id = uuid.uuid4()
     rel_path = f"{person_id}/{media_id}.{ext}"
-    abs_path = os.path.join(settings.media_storage_path, rel_path)
+    abs_path = _safe_media_path(settings.media_storage_path, rel_path)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
     with open(abs_path, "wb") as f:
@@ -45,7 +60,7 @@ async def upload_avatar(
     media = Media(
         id=media_id,
         person_id=person_id,
-        file_name=file.filename or f"{media_id}.{ext}",
+        file_name=f"{media_id}.{ext}",
         file_path=rel_path,
         media_type=MediaType.photo,
         mime_type=file.content_type,
@@ -64,7 +79,7 @@ async def get_media_file(media_id: UUID, db: AsyncSession = Depends(get_db)):
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
     settings = get_settings()
-    abs_path = os.path.join(settings.media_storage_path, media.file_path)
+    abs_path = _safe_media_path(settings.media_storage_path, media.file_path)
     if not os.path.exists(abs_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     return FileResponse(abs_path, media_type=media.mime_type)
