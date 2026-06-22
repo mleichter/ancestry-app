@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://familytree:${DB_PASSWORD}@db:5432/familytree
+      MEDIA_STORAGE_PATH: /data/media
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - apparmor=unconfined
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    ports:
+      - "3000:3000"
+    security_opt:
+      - apparmor=unconfined
+
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_DB: familytree
+      POSTGRES_USER: familytree
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U familytree"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - apparmor=unconfined
+
+volumes:
+  pg_data:
+  media_data:
