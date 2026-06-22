@@ -26,9 +26,15 @@ const GENDER_COLORS: Record<string, { bg: string; border: string }> = {
 
 function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
   const colors = GENDER_COLORS[data.gender ?? 'unknown'] ?? GENDER_COLORS.unknown
+  const hs = { background: colors.border, width: 8, height: 8 }
   return (
     <>
-      <Handle type="target" position={Position.Top} style={{ background: colors.border }} />
+      {/* top/bottom for parent-child edges */}
+      <Handle id="top"    type="target" position={Position.Top}    style={hs} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={hs} />
+      {/* left/right for partner edges */}
+      <Handle id="left"   type="target" position={Position.Left}   style={{ ...hs, top: '50%' }} />
+      <Handle id="right"  type="source" position={Position.Right}  style={{ ...hs, top: '50%' }} />
       <div
         onClick={data.onClick}
         style={{ background: colors.bg, borderColor: colors.border }}
@@ -52,7 +58,6 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
           <div className="text-xs text-gray-400">✝</div>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: colors.border }} />
     </>
   )
 }
@@ -121,17 +126,31 @@ function buildLayout(
   }))
 
   const edges: Edge[] = treeEdges.map(e => {
-    const isPartner = e.type === 'partner'
+    if (e.type === 'partner') {
+      // Connect via side handles so the line is horizontal between same-level nodes.
+      // Orient so "source" is the left node → right handle, "target" is the right node → left handle.
+      const srcX = pos.get(e.source)?.x ?? 0
+      const tgtX = pos.get(e.target)?.x ?? 0
+      const [leftId, rightId] = srcX <= tgtX ? [e.source, e.target] : [e.target, e.source]
+      return {
+        id: e.id,
+        source: leftId,
+        target: rightId,
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#ec4899', strokeDasharray: '6,3', strokeWidth: 2 },
+      }
+    }
     return {
       id: e.id,
       source: e.source,
       target: e.target,
-      label: undefined,
-      animated: isPartner,
-      markerEnd: !isPartner ? { type: MarkerType.ArrowClosed, color: '#6366f1' } : undefined,
-      style: isPartner
-        ? { stroke: '#ec4899', strokeDasharray: '6,3', strokeWidth: 2 }
-        : { stroke: '#6366f1', strokeWidth: 2 },
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+      style: { stroke: '#6366f1', strokeWidth: 2 },
     }
   })
 
