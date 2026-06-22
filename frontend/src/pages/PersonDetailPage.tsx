@@ -8,9 +8,9 @@ import type { RelationshipCreate, RelationshipType } from '../types'
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
-    <div className="flex gap-4 py-2 border-b border-gray-100 last:border-0">
-      <span className="text-gray-500 w-40 shrink-0 text-sm">{label}</span>
-      <span className="text-gray-800 text-sm">{value}</span>
+    <div className="flex gap-4 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+      <span className="text-gray-500 dark:text-gray-400 w-40 shrink-0 text-sm">{label}</span>
+      <span className="text-gray-800 dark:text-gray-200 text-sm">{value}</span>
     </div>
   )
 }
@@ -74,7 +74,7 @@ export default function PersonDetailPage() {
   })
   const relType = watch('type')
 
-  if (isLoading) return <div className="text-center py-12 text-gray-500">Lade...</div>
+  if (isLoading) return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Lade…</div>
   if (!person) return <div className="text-center py-12 text-red-500">Person nicht gefunden</div>
 
   const otherPersons = allPersons.filter(p => p.id !== id)
@@ -86,13 +86,13 @@ export default function PersonDetailPage() {
       person_b_id: data.person_b_id,
       type: data.type,
       ...(data.start_date && { start_date: data.start_date }),
-      ...(data.end_date && { end_date: data.end_date }),
-      ...(data.notes && { notes: data.notes }),
+      ...(data.end_date   && { end_date:   data.end_date   }),
+      ...(data.notes      && { notes:      data.notes      }),
     }
     addRelMutation.mutate(payload)
   }
 
-  const inp = 'border border-gray-300 rounded px-2 py-1.5 text-sm w-full'
+  const inp = 'border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500'
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -103,9 +103,9 @@ export default function PersonDetailPage() {
             {person.avatar_media_id ? (
               <img src={mediaApi.fileUrl(person.avatar_media_id)}
                 alt={`${person.first_name} ${person.last_name}`}
-                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow" />
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600 shadow" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xl font-medium">
+              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500 text-xl font-medium">
                 {person.first_name[0]}{person.last_name[0]}
               </div>
             )}
@@ -118,20 +118,25 @@ export default function PersonDetailPage() {
               onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatarMutation.mutate(f) }} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">{person.first_name} {person.last_name}</h1>
-            {person.birth_name && <p className="text-gray-500 text-sm mt-0.5">geb. {person.birth_name}</p>}
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">{person.first_name} {person.last_name}</h1>
+            {person.birth_name && <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">geb. {person.birth_name}</p>}
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link to={`/persons/${id}/edit`} className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 text-sm">Bearbeiten</Link>
+          <Link to={`/persons/${id}/edit`}
+            className="px-4 py-2 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-sm">
+            Bearbeiten
+          </Link>
           <button onClick={() => { if (confirm('Person löschen?')) deletePersonMutation.mutate() }}
-            className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm">Löschen</button>
+            className="px-4 py-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-sm">
+            Löschen
+          </button>
         </div>
       </div>
 
       {/* Details */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3">Personendaten</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm mb-6">
+        <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Personendaten</h2>
         <InfoRow label="Geschlecht" value={person.gender} />
         <InfoRow label="Geburtsdatum" value={person.date_of_birth} />
         <InfoRow label="Geburtsort" value={person.place_of_birth} />
@@ -140,28 +145,29 @@ export default function PersonDetailPage() {
         <InfoRow label="Nationalität" value={person.nationality} />
         <InfoRow label="Herkunft" value={person.origin} />
         {person.biography && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 mb-1">Biografie</p>
-            <p className="text-sm text-gray-800 whitespace-pre-line">{person.biography}</p>
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Biografie</p>
+            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">{person.biography}</p>
           </div>
         )}
       </div>
 
       {/* Relationships */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-gray-700">Beziehungen</h2>
-          <button onClick={() => setShowRelForm(v => !v)} className="text-sm text-indigo-600 hover:underline">
+          <h2 className="font-semibold text-gray-700 dark:text-gray-300">Beziehungen</h2>
+          <button onClick={() => setShowRelForm(v => !v)}
+            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
             + Beziehung hinzufügen
           </button>
         </div>
 
         {showRelForm && (
           <form onSubmit={handleSubmit(onAddRel)}
-            className="bg-indigo-50 rounded-lg p-4 mb-4 space-y-3">
+            className="bg-indigo-50 dark:bg-indigo-950/40 rounded-lg p-4 mb-4 space-y-3 border border-indigo-100 dark:border-indigo-900">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Person *</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Person *</label>
                 <select {...register('person_b_id', { required: true })} className={inp}>
                   <option value="">– wählen –</option>
                   {otherPersons.map(p => (
@@ -170,7 +176,7 @@ export default function PersonDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Art *</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Art *</label>
                 <select {...register('type', { required: true })} className={inp}>
                   <option value="">– wählen –</option>
                   <option value="parent_child">Diese Person ist Elternteil</option>
@@ -182,27 +188,27 @@ export default function PersonDetailPage() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Beginn (z.B. Hochzeit)</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Beginn (z.B. Hochzeit)</label>
                     <input {...register('start_date')} placeholder="JJJJ-MM-TT" className={inp} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Ende</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ende</label>
                     <input {...register('end_date')} placeholder="JJJJ-MM-TT" className={inp} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Notizen</label>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notizen</label>
                   <input {...register('notes')} placeholder="z.B. verheiratet in München" className={inp} />
                 </div>
               </>
             )}
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={addRelMutation.isPending}
-                className="bg-indigo-600 text-white px-4 py-1.5 rounded text-sm hover:bg-indigo-700 disabled:opacity-50">
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm disabled:opacity-50">
                 Hinzufügen
               </button>
               <button type="button" onClick={() => { setShowRelForm(false); reset() }}
-                className="text-sm text-gray-500 hover:text-gray-700 px-2">
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2">
                 Abbrechen
               </button>
             </div>
@@ -210,7 +216,7 @@ export default function PersonDetailPage() {
         )}
 
         {rels.length === 0 ? (
-          <p className="text-sm text-gray-400">Keine Beziehungen vorhanden.</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">Keine Beziehungen vorhanden.</p>
         ) : (
           <div className="space-y-1">
             {rels.map(rel => {
@@ -220,21 +226,26 @@ export default function PersonDetailPage() {
               const isA = rel.person_a_id === id
               const dateRange = [rel.start_date, rel.end_date].filter(Boolean).join(' – ')
               return (
-                <div key={rel.id} className="flex items-start justify-between py-2.5 border-b border-gray-100 last:border-0">
+                <div key={rel.id} className="flex items-start justify-between py-2.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <div className="flex items-start gap-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 shrink-0 ${isParent ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 shrink-0 ${
+                      isParent
+                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                        : 'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300'
+                    }`}>
                       {isParent ? (isA ? 'Elternteil von' : 'Kind von') : 'Partner von'}
                     </span>
                     <div>
-                      <Link to={`/persons/${otherId}`} className="text-sm font-medium text-gray-700 hover:text-indigo-600">
+                      <Link to={`/persons/${otherId}`}
+                        className="text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">
                         {other ? `${other.first_name} ${other.last_name}` : otherId}
                       </Link>
-                      {dateRange && <p className="text-xs text-gray-400 mt-0.5">{dateRange}</p>}
-                      {rel.notes && <p className="text-xs text-gray-500 mt-0.5 italic">{rel.notes}</p>}
+                      {dateRange && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{dateRange}</p>}
+                      {rel.notes && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">{rel.notes}</p>}
                     </div>
                   </div>
                   <button onClick={() => deleteRelMutation.mutate(rel.id)}
-                    className="text-xs text-red-400 hover:text-red-600 px-2 mt-0.5 shrink-0">✕</button>
+                    className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 px-2 mt-0.5 shrink-0">✕</button>
                 </div>
               )
             })}

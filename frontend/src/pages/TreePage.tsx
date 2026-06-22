@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ReactFlow, {
@@ -17,16 +18,28 @@ import 'reactflow/dist/style.css'
 import { treeApi, mediaApi } from '../api/client'
 import type { TreeNode, TreeEdge } from '../types'
 
-const GENDER_COLORS: Record<string, { bg: string; border: string }> = {
-  male:    { bg: '#dbeafe', border: '#93c5fd' },
-  female:  { bg: '#fce7f3', border: '#f9a8d4' },
-  other:   { bg: '#e0e7ff', border: '#a5b4fc' },
-  unknown: { bg: '#f3f4f6', border: '#d1d5db' },
+// Colors via CSS variables — auto-switch with prefers-color-scheme (see index.css)
+const GENDER_VARS: Record<string, string> = {
+  male: 'male', female: 'female', other: 'other', unknown: 'unknown',
+}
+function nodeVars(gender?: string) {
+  const g = GENDER_VARS[gender ?? 'unknown'] ?? 'unknown'
+  return {
+    bg:     `var(--node-${g}-bg)`,
+    border: `var(--node-${g}-border)`,
+  }
+}
+// Static light-mode values used only for MiniMap (JS can't read CSS vars directly)
+const MINIMAP_COLORS_LIGHT: Record<string, string> = {
+  male: '#dbeafe', female: '#fce7f3', other: '#e0e7ff', unknown: '#f3f4f6',
+}
+const MINIMAP_COLORS_DARK: Record<string, string> = {
+  male: '#1e3a5f', female: '#4a1a42', other: '#2e1065', unknown: '#1f2937',
 }
 
 function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
-  const colors = GENDER_COLORS[data.gender ?? 'unknown'] ?? GENDER_COLORS.unknown
-  const hs = { background: colors.border, width: 8, height: 8 }
+  const { bg, border } = nodeVars(data.gender)
+  const hs = { background: border, width: 8, height: 8 }
   return (
     <>
       <Handle id="top"    type="target" position={Position.Top}    style={hs} />
@@ -35,21 +48,21 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
       <Handle id="right"  type="source" position={Position.Right}  style={{ ...hs, top: '50%' }} />
       <div
         onClick={data.onClick}
-        style={{ background: colors.bg, borderColor: colors.border }}
+        style={{ background: bg, borderColor: border }}
         className="px-3 py-2 rounded-xl border-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow min-w-[130px] max-w-[160px] text-center"
       >
         {data.avatar_media_id && (
           <img src={mediaApi.fileUrl(data.avatar_media_id)} alt={data.label}
-            className="w-10 h-10 rounded-full object-cover mx-auto mb-1 border border-white shadow-sm" />
+            className="w-10 h-10 rounded-full object-cover mx-auto mb-1 border border-white/30 shadow-sm" />
         )}
-        <div className="font-semibold text-gray-800 text-xs leading-tight">{data.label}</div>
+        <div className="font-semibold text-gray-800 dark:text-gray-100 text-xs leading-tight">{data.label}</div>
         {(data.date_of_birth || data.date_of_death) && (
-          <div className="text-xs text-gray-500 mt-0.5">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {data.date_of_birth ? `* ${data.date_of_birth.slice(0, 4)}` : ''}
             {data.date_of_death ? ` † ${data.date_of_death.slice(0, 4)}` : ''}
           </div>
         )}
-        {!data.is_living && !data.date_of_death && <div className="text-xs text-gray-400">✝</div>}
+        {!data.is_living && !data.date_of_death && <div className="text-xs text-gray-400 dark:text-gray-500">✝</div>}
       </div>
     </>
   )
@@ -217,6 +230,7 @@ function buildLayout(
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function TreePage() {
+  const dark = useDarkMode()
   const { data, isLoading } = useQuery({ queryKey: ['tree'], queryFn: treeApi.get })
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -229,19 +243,22 @@ export default function TreePage() {
     setEdges(e)
   }, [data, onNavigate, setNodes, setEdges])
 
-  if (isLoading) return <div className="text-center py-12 text-gray-500">Lade Stammbaum…</div>
+  if (isLoading) return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Lade Stammbaum…</div>
 
   if (!data || data.nodes.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-400">
+      <div className="text-center py-16 text-gray-400 dark:text-gray-500">
         <p className="text-lg mb-2">Der Stammbaum ist noch leer.</p>
-        <Link to="/persons/new" className="text-indigo-600 hover:underline">Erste Person anlegen</Link>
+        <Link to="/persons/new" className="text-indigo-600 dark:text-indigo-400 hover:underline">Erste Person anlegen</Link>
       </div>
     )
   }
 
+  const minimapColors = dark ? MINIMAP_COLORS_DARK : MINIMAP_COLORS_LIGHT
+
   return (
-    <div style={{ height: 'calc(100vh - 120px)' }} className="rounded-xl border border-gray-200 overflow-hidden shadow-sm bg-white">
+    <div style={{ height: 'calc(100vh - 120px)' }}
+      className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -252,9 +269,9 @@ export default function TreePage() {
         fitViewOptions={{ padding: 0.3 }}
         minZoom={0.2}
       >
-        <Background color="#e5e7eb" gap={20} />
+        <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
         <Controls />
-        <MiniMap nodeColor={n => GENDER_COLORS[n.data?.gender ?? 'unknown']?.bg ?? '#f3f4f6'} />
+        <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
       </ReactFlow>
     </div>
   )

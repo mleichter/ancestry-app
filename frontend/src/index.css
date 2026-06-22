@@ -3,5 +3,36 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+}
+
+/* ── ReactFlow node colors via CSS vars (auto-switch with prefers-color-scheme) */
+:root {
+  --node-male-bg:      #dbeafe; --node-male-border:    #93c5fd;
+  --node-female-bg:    #fce7f3; --node-female-border:  #f9a8d4;
+  --node-other-bg:     #e0e7ff; --node-other-border:   #a5b4fc;
+  --node-unknown-bg:   #f3f4f6; --node-unknown-border: #d1d5db;
+  --rf-bg:  #f9fafb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --node-male-bg:      #1e3a5f; --node-male-border:    #3b82f6;
+    --node-female-bg:    #4a1a42; --node-female-border:  #ec4899;
+    --node-other-bg:     #2e1065; --node-other-border:   #818cf8;
+    --node-unknown-bg:   #1f2937; --node-unknown-border: #4b5563;
+    --rf-bg: #111827;
+  }
+}
+
+/* ── ReactFlow dark-mode overrides ──────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .react-flow__background { background-color: var(--rf-bg) !important; }
+  .react-flow__controls { background: #1f2937; border-color: #374151; }
+  .react-flow__controls-button {
+    background: #1f2937; border-color: #374151; color: #d1d5db; fill: #d1d5db;
+  }
+  .react-flow__controls-button:hover { background: #374151; }
+  .react-flow__minimap { background: #1f2937 !important; }
+  .react-flow__minimap-mask { fill: rgba(17,24,39,0.6); }
 }

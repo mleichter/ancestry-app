@@ -34,9 +34,9 @@ type FormData = z.infer<typeof schema>
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }
@@ -77,12 +77,12 @@ export default function PersonFormPage() {
     else createMutation.mutate(clean as PersonCreate)
   }
 
-  const input = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none'
+  const input = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none'
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">{isEdit ? 'Person bearbeiten' : 'Neue Person'}</h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">{isEdit ? 'Person bearbeiten' : 'Neue Person'}</h1>
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Vorname *" error={errors.first_name?.message}>
             <input {...register('first_name')} className={input} />
@@ -107,7 +107,7 @@ export default function PersonFormPage() {
           <Field label="Lebt noch">
             <div className="flex items-center h-10">
               <input type="checkbox" {...register('is_living')} className="w-4 h-4 text-indigo-600 rounded mr-2" />
-              <span className="text-sm text-gray-600">Person lebt noch</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">Person lebt noch</span>
             </div>
           </Field>
         </div>
@@ -142,7 +142,7 @@ export default function PersonFormPage() {
           <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">
             {isEdit ? 'Speichern' : 'Anlegen'}
           </button>
-          <button type="button" onClick={() => navigate(-1)} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+          <button type="button" onClick={() => navigate(-1)} className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             Abbrechen
           </button>
         </div>
