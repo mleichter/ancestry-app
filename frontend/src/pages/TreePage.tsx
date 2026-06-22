@@ -5,6 +5,7 @@ import ReactFlow, {
   Controls,
   Background,
   MiniMap,
+  Handle,
   useNodesState,
   useEdgesState,
   type Node,
@@ -26,21 +27,25 @@ const GENDER_COLORS: Record<string, string> = {
 function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
   const bg = GENDER_COLORS[data.gender ?? 'unknown'] ?? '#f3f4f6'
   return (
-    <div
-      onClick={data.onClick}
-      style={{ background: bg }}
-      className="px-4 py-3 rounded-xl border-2 border-gray-300 shadow cursor-pointer hover:border-indigo-400 transition-colors min-w-[140px] text-center"
-    >
-      <div className="font-semibold text-gray-800 text-sm">{data.label}</div>
-      {data.date_of_birth && (
-        <div className="text-xs text-gray-500 mt-0.5">
-          * {data.date_of_birth}{data.date_of_death ? ` † ${data.date_of_death}` : ''}
-        </div>
-      )}
-      {!data.is_living && !data.date_of_death && (
-        <div className="text-xs text-gray-400 mt-0.5">✝</div>
-      )}
-    </div>
+    <>
+      <Handle type="target" position={Position.Top} />
+      <div
+        onClick={data.onClick}
+        style={{ background: bg }}
+        className="px-4 py-3 rounded-xl border-2 border-gray-300 shadow cursor-pointer hover:border-indigo-400 transition-colors min-w-[140px] text-center"
+      >
+        <div className="font-semibold text-gray-800 text-sm">{data.label}</div>
+        {data.date_of_birth && (
+          <div className="text-xs text-gray-500 mt-0.5">
+            * {data.date_of_birth}{data.date_of_death ? ` † ${data.date_of_death}` : ''}
+          </div>
+        )}
+        {!data.is_living && !data.date_of_death && (
+          <div className="text-xs text-gray-400 mt-0.5">✝</div>
+        )}
+      </div>
+      <Handle type="source" position={Position.Bottom} />
+    </>
   )
 }
 

@@ -7,14 +7,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { personsApi } from '../api/client'
 import type { PersonCreate } from '../types'
 
+const dateField = z
+  .string()
+  .refine(v => !v || /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v), {
+    message: 'Format: JJJJ, JJJJ-MM oder JJJJ-MM-TT',
+  })
+  .optional()
+
 const schema = z.object({
   first_name: z.string().min(1, 'Pflichtfeld'),
   last_name: z.string().min(1, 'Pflichtfeld'),
   birth_name: z.string().optional(),
   gender: z.enum(['male', 'female', 'other', 'unknown']).optional(),
-  date_of_birth: z.string().optional(),
+  date_of_birth: dateField,
   place_of_birth: z.string().optional(),
-  date_of_death: z.string().optional(),
+  date_of_death: dateField,
   place_of_death: z.string().optional(),
   is_living: z.boolean().default(true),
   nationality: z.string().optional(),
@@ -105,16 +112,16 @@ export default function PersonFormPage() {
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Geburtsdatum">
-            <input {...register('date_of_birth')} placeholder="YYYY-MM-DD" className={input} />
+          <Field label="Geburtsdatum" error={errors.date_of_birth?.message}>
+            <input {...register('date_of_birth')} placeholder="JJJJ-MM-TT" className={input} />
           </Field>
           <Field label="Geburtsort">
             <input {...register('place_of_birth')} className={input} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Sterbedatum">
-            <input {...register('date_of_death')} placeholder="YYYY-MM-DD" className={input} />
+          <Field label="Sterbedatum" error={errors.date_of_death?.message}>
+            <input {...register('date_of_death')} placeholder="JJJJ-MM-TT" className={input} />
           </Field>
           <Field label="Sterbeort">
             <input {...register('place_of_death')} className={input} />
