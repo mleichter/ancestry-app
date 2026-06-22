@@ -3,8 +3,7 @@ services:
     build:
       context: ./backend
       target: prod
-    ports:
-      - "8000:8000"
+    # No host port — only the frontend container on the bridge network can reach the API
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://familytree:${DB_PASSWORD}@db:5432/familytree
