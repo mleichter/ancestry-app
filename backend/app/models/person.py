@@ -35,7 +35,9 @@ class Person(Base, TimestampMixin):
     )
 
     media: Mapped[list["Media"]] = relationship(  # type: ignore[name-defined]
-        "Media", foreign_keys="[Media.person_id]", back_populates="person"
+        "Media",
+        primaryjoin="Media.person_id == Person.id",
+        back_populates="person",
     )
     relationships_as_a: Mapped[list["Relationship"]] = relationship(  # type: ignore[name-defined]
         "Relationship", foreign_keys="[Relationship.person_a_id]", back_populates="person_a"

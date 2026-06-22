@@ -1,0 +1,145 @@
+import { useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { personsApi } from '../api/client'
+import type { PersonCreate } from '../types'
+
+const schema = z.object({
+  first_name: z.string().min(1, 'Pflichtfeld'),
+  last_name: z.string().min(1, 'Pflichtfeld'),
+  birth_name: z.string().optional(),
+  gender: z.enum(['male', 'female', 'other', 'unknown']).optional(),
+  date_of_birth: z.string().optional(),
+  place_of_birth: z.string().optional(),
+  date_of_death: z.string().optional(),
+  place_of_death: z.string().optional(),
+  is_living: z.boolean().default(true),
+  nationality: z.string().optional(),
+  origin: z.string().optional(),
+  biography: z.string().optional(),
+})
+
+type FormData = z.infer<typeof schema>
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {children}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+export default function PersonFormPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const isEdit = Boolean(id)
+
+  const { data: existing } = useQuery({
+    queryKey: ['persons', id],
+    queryFn: () => personsApi.get(id!),
+    enabled: isEdit,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { is_living: true },
+  })
+
+  useEffect(() => {
+    if (existing) reset({ ...existing, gender: existing.gender ?? undefined })
+  }, [existing, reset])
+
+  const createMutation = useMutation({
+    mutationFn: (data: PersonCreate) => personsApi.create(data),
+    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${p.id}`) },
+  })
+  const updateMutation = useMutation({
+    mutationFn: (data: Partial<PersonCreate>) => personsApi.update(id!, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${id}`) },
+  })
+
+  const onSubmit = (data: FormData) => {
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== '' && v !== undefined))
+    if (isEdit) updateMutation.mutate(clean)
+    else createMutation.mutate(clean as PersonCreate)
+  }
+
+  const input = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none'
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{isEdit ? 'Person bearbeiten' : 'Neue Person'}</h1>
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Vorname *" error={errors.first_name?.message}>
+            <input {...register('first_name')} className={input} />
+          </Field>
+          <Field label="Nachname *" error={errors.last_name?.message}>
+            <input {...register('last_name')} className={input} />
+          </Field>
+        </div>
+        <Field label="Geburtsname">
+          <input {...register('birth_name')} className={input} />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Geschlecht">
+            <select {...register('gender')} className={input}>
+              <option value="">– bitte wählen –</option>
+              <option value="male">Männlich</option>
+              <option value="female">Weiblich</option>
+              <option value="other">Divers</option>
+              <option value="unknown">Unbekannt</option>
+            </select>
+          </Field>
+          <Field label="Lebt noch">
+            <div className="flex items-center h-10">
+              <input type="checkbox" {...register('is_living')} className="w-4 h-4 text-indigo-600 rounded mr-2" />
+              <span className="text-sm text-gray-600">Person lebt noch</span>
+            </div>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Geburtsdatum">
+            <input {...register('date_of_birth')} placeholder="YYYY-MM-DD" className={input} />
+          </Field>
+          <Field label="Geburtsort">
+            <input {...register('place_of_birth')} className={input} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Sterbedatum">
+            <input {...register('date_of_death')} placeholder="YYYY-MM-DD" className={input} />
+          </Field>
+          <Field label="Sterbeort">
+            <input {...register('place_of_death')} className={input} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Nationalität">
+            <input {...register('nationality')} className={input} />
+          </Field>
+          <Field label="Herkunft">
+            <input {...register('origin')} className={input} />
+          </Field>
+        </div>
+        <Field label="Biografie">
+          <textarea {...register('biography')} rows={4} className={input + ' resize-none'} />
+        </Field>
+        <div className="flex gap-3 pt-2">
+          <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+            {isEdit ? 'Speichern' : 'Anlegen'}
+          </button>
+          <button type="button" onClick={() => navigate(-1)} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+            Abbrechen
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
