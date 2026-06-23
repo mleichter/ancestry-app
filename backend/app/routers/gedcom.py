@@ -1,7 +1,7 @@
 import io
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +79,7 @@ async def export_gedcom(
         "1 GEDC",
         "2 VERS 5.5.1",
         "1 CHAR UTF-8",
-        f"1 DATE {datetime.utcnow().strftime('%d %b %Y').upper()}",
+        f"1 DATE {datetime.now(timezone.utc).strftime('%d %b %Y').upper()}",
     ]
 
     for p in persons:
@@ -317,7 +317,7 @@ async def export_json(
 
     data = {
         "version": "1.0",
-        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "persons": [_person_dict(p) for p in persons],
         "relationships": [
             {
