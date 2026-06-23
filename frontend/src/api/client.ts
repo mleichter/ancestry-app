@@ -46,7 +46,8 @@ export const mediaApi = {
 }
 
 export const gedcomApi = {
-  exportUrl: () => '/api/v1/gedcom/export',
+  exportUrl: (anonymizeLiving = false) =>
+    `/api/v1/gedcom/export${anonymizeLiving ? '?anonymize_living=true' : ''}`,
   import: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -55,7 +56,8 @@ export const gedcomApi = {
 }
 
 export const exportApi = {
-  jsonExportUrl: () => '/api/v1/export/json',
+  jsonExportUrl: (anonymizeLiving = false) =>
+    `/api/v1/export/json${anonymizeLiving ? '?anonymize_living=true' : ''}`,
   importJson: (file: File) => {
     const form = new FormData()
     form.append('file', file)

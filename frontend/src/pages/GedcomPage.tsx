@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { gedcomApi, exportApi } from '../api/client'
+import { useSettings } from '../hooks/useSettings'
 import type { GedcomImportResult } from '../types'
 
 type Tab = 'gedcom' | 'json'
@@ -56,6 +57,7 @@ function ImportZone({ onImport, isPending, isError, result }: {
 
 export default function GedcomPage() {
   const qc = useQueryClient()
+  const { settings } = useSettings()
   const [tab, setTab] = useState<Tab>('gedcom')
   const [gedcomResult, setGedcomResult] = useState<GedcomImportResult | null>(null)
   const [jsonResult, setJsonResult] = useState<GedcomImportResult | null>(null)
@@ -106,8 +108,13 @@ export default function GedcomPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Alle Personen und Beziehungen als GEDCOM-Datei (kompatibel mit Ancestry, MyHeritage, FamilySearch).
             </p>
+            {settings.anonymize_living && (
+              <p className="mb-3 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                Anonymisierung aktiv — lebende Personen werden ohne persönliche Daten exportiert.
+              </p>
+            )}
             <a
-              href={gedcomApi.exportUrl()}
+              href={gedcomApi.exportUrl(settings.anonymize_living)}
               download="stammbaum.ged"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
             >
@@ -139,8 +146,13 @@ export default function GedcomPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Alle Daten als JSON exportieren. Eignet sich als Backup oder für eigene Weiterverarbeitung.
             </p>
+            {settings.anonymize_living && (
+              <p className="mb-3 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                Anonymisierung aktiv — lebende Personen werden ohne persönliche Daten exportiert.
+              </p>
+            )}
             <a
-              href={exportApi.jsonExportUrl()}
+              href={exportApi.jsonExportUrl(settings.anonymize_living)}
               download="stammbaum.json"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
             >

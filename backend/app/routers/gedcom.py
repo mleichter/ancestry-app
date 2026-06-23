@@ -2,7 +2,7 @@ import io
 import json
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -58,7 +58,10 @@ def _strip_xref(value: str) -> str | None:
 # ── GEDCOM export ──────────────────────────────────────────────────────────────
 
 @router.get("/gedcom/export")
-async def export_gedcom(db: AsyncSession = Depends(get_db)):
+async def export_gedcom(
+    anonymize_living: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
     persons = (await db.execute(select(Person))).scalars().all()
     rels = (await db.execute(select(Relationship))).scalars().all()
 
@@ -78,6 +81,10 @@ async def export_gedcom(db: AsyncSession = Depends(get_db)):
     for p in persons:
         n = idx[str(p.id)]
         lines += [f"0 @I{n}@ INDI"]
+        if anonymize_living and p.is_living:
+            # Preserve the record (so family links work) but strip all personal data
+            lines += ["1 NAME Lebende /Person/", "1 RESN PRIVACY"]
+            continue
         surname = p.birth_name or p.last_name
         lines += [f"1 NAME {p.first_name} /{surname}/"]
         if p.gender:
@@ -265,32 +272,37 @@ async def import_gedcom(
 # ── JSON export ────────────────────────────────────────────────────────────────
 
 @router.get("/export/json")
-async def export_json(db: AsyncSession = Depends(get_db)):
+async def export_json(
+    anonymize_living: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
     persons = (await db.execute(select(Person))).scalars().all()
     rels = (await db.execute(select(Relationship))).scalars().all()
+
+    def _person_dict(p: Person) -> dict:
+        if anonymize_living and p.is_living:
+            return {"id": str(p.id), "is_living": True}
+        return {
+            "id": str(p.id),
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "birth_name": p.birth_name,
+            "gender": p.gender.value if p.gender else None,
+            "date_of_birth": p.date_of_birth,
+            "place_of_birth": p.place_of_birth,
+            "date_of_death": p.date_of_death,
+            "place_of_death": p.place_of_death,
+            "is_living": p.is_living,
+            "nationality": p.nationality,
+            "origin": p.origin,
+            "occupations": p.occupations,
+            "biography": p.biography,
+        }
 
     data = {
         "version": "1.0",
         "exported_at": datetime.utcnow().isoformat() + "Z",
-        "persons": [
-            {
-                "id": str(p.id),
-                "first_name": p.first_name,
-                "last_name": p.last_name,
-                "birth_name": p.birth_name,
-                "gender": p.gender.value if p.gender else None,
-                "date_of_birth": p.date_of_birth,
-                "place_of_birth": p.place_of_birth,
-                "date_of_death": p.date_of_death,
-                "place_of_death": p.place_of_death,
-                "is_living": p.is_living,
-                "nationality": p.nationality,
-                "origin": p.origin,
-                "occupations": p.occupations,
-                "biography": p.biography,
-            }
-            for p in persons
-        ],
+        "persons": [_person_dict(p) for p in persons],
         "relationships": [
             {
                 "id": str(r.id),

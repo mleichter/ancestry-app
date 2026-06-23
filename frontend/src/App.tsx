@@ -7,6 +7,7 @@ import TimelinePage from './pages/TimelinePage'
 import GedcomPage from './pages/GedcomPage'
 import DashboardPage from './pages/DashboardPage'
 import SurnamesPage from './pages/SurnamesPage'
+import SettingsPage from './pages/SettingsPage'
 
 function Nav() {
   const cls = ({ isActive }: { isActive: boolean }) =>
@@ -24,6 +25,7 @@ function Nav() {
       <NavLink to="/timeline" className={cls}>Zeitleiste</NavLink>
       <NavLink to="/surnames" className={cls}>Familien</NavLink>
       <NavLink to="/gedcom" className={cls}>GEDCOM</NavLink>
+      <NavLink to="/settings" className={cls}>Einstellungen</NavLink>
     </nav>
   )
 }
@@ -44,6 +46,7 @@ export default function App() {
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/surnames" element={<SurnamesPage />} />
             <Route path="/gedcom" element={<GedcomPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>

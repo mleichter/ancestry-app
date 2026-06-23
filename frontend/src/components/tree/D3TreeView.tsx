@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { hierarchy, tree as d3tree } from 'd3'
 import { zoom as d3zoom, zoomIdentity } from 'd3'
 import { select } from 'd3'
@@ -165,11 +165,6 @@ function buildLayout(
   return { nodes, links }
 }
 
-export interface D3TreeViewHandle {
-  /** Prepare the SVG for full-tree print. Returns a cleanup function to restore state. */
-  fitAllForPrint(): () => void
-}
-
 interface D3TreeViewProps {
   data: TreeData
   rootId: string
@@ -177,8 +172,7 @@ interface D3TreeViewProps {
   onNavigate: (path: string) => void
 }
 
-const D3TreeView = forwardRef<D3TreeViewHandle, D3TreeViewProps>(
-function D3TreeView({ data, rootId, mode, onNavigate }, ref) {
+export default function D3TreeView({ data, rootId, mode, onNavigate }: D3TreeViewProps) {
   const dark = useDarkMode()
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
@@ -187,42 +181,6 @@ function D3TreeView({ data, rootId, mode, onNavigate }, ref) {
     () => buildLayout(rootId, data, mode),
     [rootId, data, mode],
   )
-
-  // Expose fitAllForPrint to parent so the PDF button can call it
-  useImperativeHandle(ref, () => ({
-    fitAllForPrint() {
-      const svgEl = svgRef.current
-      const gEl = gRef.current
-      if (!svgEl || !gEl || nodes.length === 0) return () => {}
-
-      const PAD = 48
-      const xs = nodes.map(n => n.x)
-      const ys = nodes.map(n => n.y)
-      const minX = Math.min(...xs) - PAD
-      const minY = Math.min(...ys) - PAD
-      const maxX = Math.max(...xs) + NW + PAD
-      const maxY = Math.max(...ys) + NH + PAD
-
-      // Save current state
-      const prevViewBox = svgEl.getAttribute('viewBox')
-      const prevTransform = gEl.getAttribute('transform')
-
-      // Strip the zoom transform so content is at raw layout coordinates
-      gEl.removeAttribute('transform')
-      // Set viewBox so the SVG scales all content to fit the print page
-      svgEl.setAttribute('viewBox', `${minX} ${minY} ${maxX - minX} ${maxY - minY}`)
-      // Force white background for print regardless of dark mode
-      svgEl.style.background = 'white'
-
-      return () => {
-        if (prevViewBox !== null) svgEl.setAttribute('viewBox', prevViewBox)
-        else svgEl.removeAttribute('viewBox')
-        if (prevTransform !== null) gEl.setAttribute('transform', prevTransform)
-        else gEl.removeAttribute('transform')
-        svgEl.style.background = ''
-      }
-    }
-  }), [nodes])
 
   // Zoom / pan + initial fit-to-view
   useEffect(() => {
@@ -390,6 +348,4 @@ function D3TreeView({ data, rootId, mode, onNavigate }, ref) {
       </g>
     </svg>
   )
-})
-
-export default D3TreeView
+}
