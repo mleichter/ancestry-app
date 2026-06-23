@@ -311,6 +311,7 @@ async def export_json(
             "nationality": p.nationality,
             "origin": p.origin,
             "occupations": p.occupations,
+            "sources": p.sources,
             "biography": p.biography,
         }
 
@@ -399,7 +400,7 @@ async def import_json(
             except ValueError:
                 pass
 
-        p = Person(
+        person_kwargs = dict(
             first_name=pd.get("first_name") or "Unbekannt",
             last_name=pd.get("last_name") or "Unbekannt",
             birth_name=pd.get("birth_name"),
@@ -415,6 +416,9 @@ async def import_json(
             sources=pd.get("sources"),
             biography=pd.get("biography"),
         )
+        if parsed_id:
+            person_kwargs["id"] = parsed_id
+        p = Person(**person_kwargs)
         db.add(p)
         await db.flush()
         if original_id:
