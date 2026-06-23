@@ -24,8 +24,9 @@ app.include_router(media.router, prefix="/api/v1")
 app.include_router(gedcom.router, prefix="/api/v1")
 
 
-@app.get("/health", tags=["System"])
+@app.get("/health", tags=["system"], summary="Health check")
 async def health():
+    """Liveness + readiness probe. Executes a DB ping and returns `{"status": "ok", "db": "connected"}`."""
     from sqlalchemy import text
     from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as session:

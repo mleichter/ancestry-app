@@ -57,11 +57,15 @@ def _strip_xref(value: str) -> str | None:
 
 # ── GEDCOM export ──────────────────────────────────────────────────────────────
 
-@router.get("/gedcom/export")
+@router.get("/gedcom/export", summary="Export GEDCOM file", tags=["gedcom"])
 async def export_gedcom(
-    anonymize_living: bool = Query(False),
+    anonymize_living: bool = Query(False, description="Replace living persons' data with a privacy placeholder"),
     db: AsyncSession = Depends(get_db),
 ):
+    """Export the entire family tree as a GEDCOM 5.5.1 file compatible with standard genealogy software.
+
+    Pass `?anonymize_living=true` to redact all personal data for persons marked as living.
+    """
     persons = (await db.execute(select(Person))).scalars().all()
     rels = (await db.execute(select(Relationship))).scalars().all()
 
@@ -188,11 +192,16 @@ def _cr(rec: dict, tag: str) -> dict | None:
     return next((c for c in rec['children'] if c['tag'] == tag), None)
 
 
-@router.post("/gedcom/import")
+@router.post("/gedcom/import", summary="Import GEDCOM file", tags=["gedcom"])
 async def import_gedcom(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Import persons and family relationships from a GEDCOM 5.5.x file.
+
+    Existing data is not replaced — imported records are added alongside any existing ones.
+    Returns counts of created persons and relationships.
+    """
     content = (await file.read()).decode('utf-8-sig', errors='replace')
     records = _parse_records(content)
 
@@ -271,11 +280,16 @@ async def import_gedcom(
 
 # ── JSON export ────────────────────────────────────────────────────────────────
 
-@router.get("/export/json")
+@router.get("/export/json", summary="Export JSON backup", tags=["export"])
 async def export_json(
-    anonymize_living: bool = Query(False),
+    anonymize_living: bool = Query(False, description="Omit personal data for living persons"),
     db: AsyncSession = Depends(get_db),
 ):
+    """Export the full family tree as a JSON backup file (persons + relationships).
+
+    The JSON format is the native backup format and can be re-imported without data loss.
+    Pass `?anonymize_living=true` to include only the ID and `is_living` flag for living persons.
+    """
     persons = (await db.execute(select(Person))).scalars().all()
     rels = (await db.execute(select(Relationship))).scalars().all()
 
@@ -328,11 +342,16 @@ async def export_json(
 
 # ── JSON import ────────────────────────────────────────────────────────────────
 
-@router.post("/import/json")
+@router.post("/import/json", summary="Import JSON backup", tags=["export"])
 async def import_json(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Restore persons and relationships from a JSON backup produced by the export endpoint.
+
+    Existing data is not replaced — imported records are added alongside any existing ones.
+    Returns counts of created persons and relationships.
+    """
     try:
         content = (await file.read()).decode("utf-8-sig")
         data = json.loads(content)

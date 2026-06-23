@@ -31,12 +31,13 @@ def _safe_media_path(base: str, rel: str) -> str:
     return abs_path
 
 
-@router.post("/persons/{person_id}/media/avatar", status_code=201)
+@router.post("/persons/{person_id}/media/avatar", status_code=201, summary="Upload avatar", tags=["media"])
 async def upload_avatar(
     person_id: UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Upload an image and set it as the person's avatar. Accepted formats: JPEG, PNG, WebP, GIF. Max 10 MB."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -91,12 +92,13 @@ def _generate_thumb(original_abs: str, thumb_abs: str) -> None:
         img.save(thumb_abs, "JPEG", quality=85, optimize=True)
 
 
-@router.get("/media/{media_id}/file")
+@router.get("/media/{media_id}/file", summary="Serve a media file", tags=["media"])
 async def get_media_file(
     media_id: UUID,
-    thumb: bool = Query(False),
+    thumb: bool = Query(False, description="Return a 300×300 JPEG thumbnail instead of the original"),
     db: AsyncSession = Depends(get_db),
 ):
+    """Stream the raw file for a media record. Pass `?thumb=true` to get a cached 300×300 thumbnail."""
     media = await db.get(Media, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
@@ -118,8 +120,9 @@ async def get_media_file(
     return FileResponse(abs_path, media_type=media.mime_type)
 
 
-@router.get("/persons/{person_id}/media")
+@router.get("/persons/{person_id}/media", summary="List person media", tags=["media"])
 async def list_person_media(person_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Return all media records (photos) belonging to a person, newest first."""
     result = await db.execute(
         select(Media).where(Media.person_id == person_id).order_by(Media.uploaded_at.desc())
     )
@@ -137,12 +140,13 @@ async def list_person_media(person_id: UUID, db: AsyncSession = Depends(get_db))
     ]
 
 
-@router.post("/persons/{person_id}/media", status_code=201)
+@router.post("/persons/{person_id}/media", status_code=201, summary="Upload a photo", tags=["media"])
 async def upload_photo(
     person_id: UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Upload a photo to a person's gallery. Does not change the avatar. Accepted: JPEG, PNG, WebP, GIF."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -178,8 +182,9 @@ async def upload_photo(
     return {"id": str(media.id), "person_id": str(person_id)}
 
 
-@router.delete("/media/{media_id}", status_code=204)
+@router.delete("/media/{media_id}", status_code=204, summary="Delete a media file", tags=["media"])
 async def delete_media(media_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a media record and its file from disk. Clears the person's avatar if it was the avatar."""
     media = await db.get(Media, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
@@ -200,8 +205,9 @@ async def delete_media(media_id: UUID, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
 
-@router.patch("/persons/{person_id}/avatar/{media_id}")
+@router.patch("/persons/{person_id}/avatar/{media_id}", summary="Set avatar", tags=["media"])
 async def set_avatar(person_id: UUID, media_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Promote an existing gallery photo to be the person's avatar."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")

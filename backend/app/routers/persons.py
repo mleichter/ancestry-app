@@ -9,18 +9,23 @@ from app.schemas.person import PersonCreate, PersonUpdate, PersonResponse
 router = APIRouter(prefix="/persons", tags=["persons"])
 
 
-@router.get("", response_model=list[PersonResponse])
+@router.get("", response_model=list[PersonResponse], summary="List all persons")
 async def list_persons(
     skip: int = 0,
     limit: int = 5000,
     db: AsyncSession = Depends(get_db),
 ):
+    """Return all persons in the family tree, ordered by insertion time.
+
+    Use `skip` and `limit` for pagination if needed.
+    """
     result = await db.execute(select(Person).offset(skip).limit(limit))
     return result.scalars().all()
 
 
-@router.post("", response_model=PersonResponse, status_code=201)
+@router.post("", response_model=PersonResponse, status_code=201, summary="Create a person")
 async def create_person(data: PersonCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new person record. Only `first_name` and `last_name` are required."""
     person = Person(**data.model_dump())
     db.add(person)
     await db.commit()
@@ -28,18 +33,20 @@ async def create_person(data: PersonCreate, db: AsyncSession = Depends(get_db)):
     return person
 
 
-@router.get("/{person_id}", response_model=PersonResponse)
+@router.get("/{person_id}", response_model=PersonResponse, summary="Get a person")
 async def get_person(person_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Fetch a single person by UUID. Returns 404 if not found."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
     return person
 
 
-@router.patch("/{person_id}", response_model=PersonResponse)
+@router.patch("/{person_id}", response_model=PersonResponse, summary="Update a person")
 async def update_person(
     person_id: UUID, data: PersonUpdate, db: AsyncSession = Depends(get_db)
 ):
+    """Partially update a person. Only fields present in the request body are changed."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -50,8 +57,9 @@ async def update_person(
     return person
 
 
-@router.delete("/{person_id}", status_code=204)
+@router.delete("/{person_id}", status_code=204, summary="Delete a person")
 async def delete_person(person_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a person and all their relationships. Media files are not automatically removed."""
     person = await db.get(Person, person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
