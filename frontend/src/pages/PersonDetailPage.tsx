@@ -410,13 +410,25 @@ export default function PersonDetailPage() {
       {/* Details */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
         <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Personendaten</h2>
-        <InfoRow label="Geschlecht" value={person.gender} />
+        <InfoRow label="Geschlecht" value={person.gender ? ({ male: 'männlich', female: 'weiblich', other: 'divers', unknown: 'unbekannt' }[person.gender]) : undefined} />
         <InfoRow label="Geburtsdatum" value={person.date_of_birth} />
         <InfoRow label="Geburtsort" value={person.place_of_birth} withMap />
         <InfoRow label="Sterbedatum" value={person.date_of_death} />
         <InfoRow label="Sterbeort" value={person.place_of_death} withMap />
         <InfoRow label="Nationalität" value={person.nationality} />
         <InfoRow label="Herkunft" value={person.origin} />
+        {person.occupations && person.occupations.length > 0 && (
+          <div className="flex gap-4 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+            <span className="text-gray-500 dark:text-gray-400 w-40 shrink-0 text-sm">Berufe</span>
+            <div className="flex flex-wrap gap-1.5">
+              {person.occupations.map((occ, i) => (
+                <span key={i} className="px-2.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-full text-xs text-indigo-700 dark:text-indigo-300">
+                  {occ}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {person.biography && (
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Biografie</p>

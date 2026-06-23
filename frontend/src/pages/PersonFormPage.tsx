@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,11 +41,48 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   )
 }
 
+function OccupationsEditor({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  const add = () => {
+    const t = draft.trim()
+    if (t && !value.includes(t)) { onChange([...value, t]); setDraft('') }
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="Beruf eingeben + Enter"
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none"
+        />
+        <button type="button" onClick={add}
+          className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-gray-600">
+          +
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((occ, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-full text-xs text-indigo-700 dark:text-indigo-300">
+              {occ}
+              <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))}
+                className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 ml-0.5">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PersonFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isEdit = Boolean(id)
+  const [occupations, setOccupations] = useState<string[]>([])
 
   const { data: existing } = useQuery({
     queryKey: ['persons', id],
@@ -59,7 +96,10 @@ export default function PersonFormPage() {
   })
 
   useEffect(() => {
-    if (existing) reset({ ...existing, gender: existing.gender ?? undefined })
+    if (existing) {
+      reset({ ...existing, gender: existing.gender ?? undefined })
+      setOccupations(existing.occupations ?? [])
+    }
   }, [existing, reset])
 
   const createMutation = useMutation({
@@ -73,8 +113,9 @@ export default function PersonFormPage() {
 
   const onSubmit = (data: FormData) => {
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== '' && v !== undefined))
-    if (isEdit) updateMutation.mutate(clean as Partial<PersonCreate>)
-    else createMutation.mutate(clean as unknown as PersonCreate)
+    const payload = { ...clean, ...(occupations.length > 0 ? { occupations } : {}) }
+    if (isEdit) updateMutation.mutate(payload as Partial<PersonCreate>)
+    else createMutation.mutate(payload as unknown as PersonCreate)
   }
 
   const input = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none'
@@ -135,6 +176,9 @@ export default function PersonFormPage() {
             <input {...register('origin')} className={input} />
           </Field>
         </div>
+        <Field label="Berufe">
+          <OccupationsEditor value={occupations} onChange={setOccupations} />
+        </Field>
         <Field label="Biografie">
           <textarea {...register('biography')} rows={4} className={input + ' resize-none'} />
         </Field>

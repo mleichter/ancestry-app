@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ReactFlow, {
   Controls,
   Background,
@@ -17,6 +17,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { treeApi, mediaApi } from '../api/client'
 import type { TreeNode, TreeEdge } from '../types'
+import D3TreeView, { type TreeMode } from '../components/tree/D3TreeView'
+import { defaultRootId } from '../utils/treeHierarchy'
 
 const GENDER_VARS: Record<string, string> = {
   male: 'male', female: 'female', other: 'other', unknown: 'unknown',
@@ -260,17 +262,30 @@ type FilterMode = 'all' | 'ancestors' | 'descendants'
 
 export default function TreePage() {
   const dark = useDarkMode()
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({ queryKey: ['tree'], queryFn: treeApi.get })
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [filterMode, setFilterMode] = useState<FilterMode>('all')
   const [focusId, setFocusId] = useState<string>('')
-  const onNavigate = useCallback((path: string) => { window.location.href = path }, [])
+  const onNavigate = useCallback((path: string) => { navigate(path) }, [navigate])
+
+  // D3 tree state
+  const [viewMode, setViewMode] = useState<'graph' | 'tree'>('graph')
+  const [treeMode, setTreeMode] = useState<TreeMode>('descendants')
+  const [treeRootId, setTreeRootId] = useState<string>('')
 
   const sortedPersons = useMemo(() => {
     if (!data) return []
     return [...data.nodes].sort((a, b) => a.label.localeCompare(b.label))
   }, [data])
+
+  // Auto-select a sensible default root when data first loads
+  useEffect(() => {
+    if (data && data.nodes.length > 0 && !treeRootId) {
+      setTreeRootId(defaultRootId(data))
+    }
+  }, [data, treeRootId])
 
   useEffect(() => {
     if (!data) return
@@ -293,59 +308,114 @@ export default function TreePage() {
 
   const minimapColors = dark ? MINIMAP_COLORS_DARK : MINIMAP_COLORS_LIGHT
 
+  const pillCls = (active: boolean) =>
+    `px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+      active
+        ? 'bg-indigo-600 text-white'
+        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+    }`
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* Filter bar */}
+      {/* Top bar — view toggle + mode-specific controls */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Anzeigen:</span>
-        {(['all', 'ancestors', 'descendants'] as FilterMode[]).map(mode => (
-          <button
-            key={mode}
-            onClick={() => { setFilterMode(mode); if (mode === 'all') setFocusId('') }}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              filterMode === mode
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {mode === 'all' ? 'Alle' : mode === 'ancestors' ? 'Vorfahren von' : 'Nachkommen von'}
+
+        {/* Graph / Baum toggle */}
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-full p-0.5 shrink-0">
+          <button onClick={() => setViewMode('graph')} className={pillCls(viewMode === 'graph')}>
+            Graph
           </button>
-        ))}
-        {filterMode !== 'all' && (
-          <select
-            value={focusId}
-            onChange={e => setFocusId(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-indigo-300"
-          >
-            <option value="">– Person wählen –</option>
-            {sortedPersons.map(p => (
-              <option key={p.id} value={p.id}>{p.label}</option>
+          <button onClick={() => setViewMode('tree')} className={pillCls(viewMode === 'tree')}>
+            Baum
+          </button>
+        </div>
+
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+        {viewMode === 'graph' ? (
+          /* Graph mode: existing filter controls */
+          <>
+            <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Anzeigen:</span>
+            {(['all', 'ancestors', 'descendants'] as FilterMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => { setFilterMode(mode); if (mode === 'all') setFocusId('') }}
+                className={pillCls(filterMode === mode)}
+              >
+                {mode === 'all' ? 'Alle' : mode === 'ancestors' ? 'Vorfahren von' : 'Nachkommen von'}
+              </button>
             ))}
-          </select>
-        )}
-        {filterMode !== 'all' && focusId && (
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {nodes.length} Person{nodes.length !== 1 ? 'en' : ''} sichtbar
-          </span>
+            {filterMode !== 'all' && (
+              <select
+                value={focusId}
+                onChange={e => setFocusId(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                <option value="">– Person wählen –</option>
+                {sortedPersons.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            )}
+            {filterMode !== 'all' && focusId && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {nodes.length} Person{nodes.length !== 1 ? 'en' : ''} sichtbar
+              </span>
+            )}
+          </>
+        ) : (
+          /* Tree (Baum) mode controls */
+          <>
+            <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Ausgang:</span>
+            <select
+              value={treeRootId}
+              onChange={e => setTreeRootId(e.target.value)}
+              className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              {sortedPersons.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+
+            <button onClick={() => setTreeMode('descendants')} className={pillCls(treeMode === 'descendants')}>
+              Nachkommen ↓
+            </button>
+            <button onClick={() => setTreeMode('ancestors')} className={pillCls(treeMode === 'ancestors')}>
+              Vorfahren ↑
+            </button>
+          </>
         )}
       </div>
 
-      {/* Tree canvas */}
+      {/* Canvas */}
       <div className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-          minZoom={0.2}
-        >
-          <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
-          <Controls />
-          <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
-        </ReactFlow>
+        {viewMode === 'graph' ? (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.3 }}
+            minZoom={0.2}
+          >
+            <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
+            <Controls />
+            <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
+          </ReactFlow>
+        ) : (
+          treeRootId ? (
+            <D3TreeView
+              data={data}
+              rootId={treeRootId}
+              mode={treeMode}
+              onNavigate={onNavigate}
+            />
+          ) : null
+        )}
       </div>
     </div>
   )

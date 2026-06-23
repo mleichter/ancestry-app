@@ -7,9 +7,21 @@ const GENDER_LABEL: Record<string, string> = {
   male: 'männlich', female: 'weiblich', other: 'divers', unknown: 'unbekannt',
 }
 
+type SortKey = 'name_asc' | 'name_desc' | 'birth_asc' | 'birth_desc' | 'added_desc'
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'name_asc',    label: 'Name A–Z' },
+  { value: 'name_desc',   label: 'Name Z–A' },
+  { value: 'birth_asc',   label: 'Älteste zuerst' },
+  { value: 'birth_desc',  label: 'Jüngste zuerst' },
+  { value: 'added_desc',  label: 'Zuletzt hinzugefügt' },
+]
+
+const yearOf = (d?: string) => d ? parseInt(/^\d{4}/.test(d) ? d : d.slice(-4)) : null
+
 export default function PersonListPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<SortKey>('name_asc')
 
   const { data: persons = [], isLoading } = useQuery({
     queryKey: ['persons'],
@@ -25,11 +37,34 @@ export default function PersonListPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    if (!q) return persons
-    return persons.filter(p =>
-      `${p.first_name} ${p.last_name} ${p.birth_name ?? ''}`.toLowerCase().includes(q)
-    )
-  }, [persons, search])
+    let result = q
+      ? persons.filter(p => `${p.first_name} ${p.last_name} ${p.birth_name ?? ''}`.toLowerCase().includes(q))
+      : [...persons]
+
+    result.sort((a, b) => {
+      switch (sort) {
+        case 'name_asc':
+          return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+        case 'name_desc':
+          return `${b.last_name} ${b.first_name}`.localeCompare(`${a.last_name} ${a.first_name}`)
+        case 'birth_asc': {
+          const ya = yearOf(a.date_of_birth) ?? 9999
+          const yb = yearOf(b.date_of_birth) ?? 9999
+          return ya - yb
+        }
+        case 'birth_desc': {
+          const ya = yearOf(a.date_of_birth) ?? 0
+          const yb = yearOf(b.date_of_birth) ?? 0
+          return yb - ya
+        }
+        case 'added_desc':
+          return b.created_at.localeCompare(a.created_at)
+        default:
+          return 0
+      }
+    })
+    return result
+  }, [persons, search, sort])
 
   const living  = persons.filter(p => p.is_living).length
   const deceased = persons.length - living
@@ -54,13 +89,22 @@ export default function PersonListPage() {
       </div>
 
       {persons.length > 0 && (
-        <input
-          type="search"
-          placeholder="Nach Name suchen…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full mb-4 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none"
-        />
+        <div className="flex gap-2 mb-4">
+          <input
+            type="search"
+            placeholder="Nach Name suchen…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none"
+          />
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value as SortKey)}
+            className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none shrink-0"
+          >
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       )}
 
       {persons.length === 0 ? (
