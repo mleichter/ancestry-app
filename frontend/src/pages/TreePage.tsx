@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -9,6 +9,7 @@ import ReactFlow, {
   Handle,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
   Position,
@@ -17,7 +18,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { treeApi, mediaApi } from '../api/client'
 import type { TreeNode, TreeEdge } from '../types'
-import D3TreeView, { type TreeMode } from '../components/tree/D3TreeView'
+import D3TreeView, { type TreeMode, type D3TreeViewHandle } from '../components/tree/D3TreeView'
 import { defaultRootId } from '../utils/treeHierarchy'
 
 const GENDER_VARS: Record<string, string> = {
@@ -68,6 +69,17 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
 }
 
 const nodeTypes = { person: PersonNode }
+
+// Rendered inside <ReactFlow> so it can call useReactFlow()
+function PrintFitView() {
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    const handler = () => fitView({ padding: 0.12 })
+    window.addEventListener('beforeprint', handler)
+    return () => window.removeEventListener('beforeprint', handler)
+  }, [fitView])
+  return null
+}
 
 // ─── Branch filter helpers ────────────────────────────────────────────────────
 
@@ -274,6 +286,18 @@ export default function TreePage() {
   const [viewMode, setViewMode] = useState<'graph' | 'tree'>('graph')
   const [treeMode, setTreeMode] = useState<TreeMode>('descendants')
   const [treeRootId, setTreeRootId] = useState<string>('')
+  const d3TreeRef = useRef<D3TreeViewHandle>(null)
+
+  const handlePrint = useCallback(() => {
+    if (viewMode === 'tree') {
+      // Fit the full D3 tree into the SVG viewBox before printing
+      const restore = d3TreeRef.current?.fitAllForPrint() ?? (() => {})
+      // afterprint fires when the print dialog closes (whether or not the user printed)
+      window.addEventListener('afterprint', restore, { once: true })
+    }
+    // For graph mode, PrintFitView handles beforeprint via useReactFlow
+    window.print()
+  }, [viewMode])
 
   const sortedPersons = useMemo(() => {
     if (!data) return []
@@ -316,7 +340,7 @@ export default function TreePage() {
     }`
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="print-canvas-wrapper flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Top bar — view toggle + mode-specific controls */}
       <div className="flex items-center gap-3 mb-3 flex-wrap print-hide">
 
@@ -390,7 +414,7 @@ export default function TreePage() {
 
         {/* PDF button — always visible, pushed to the right */}
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           className="ml-auto shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           title="Als PDF drucken"
         >
@@ -414,10 +438,12 @@ export default function TreePage() {
             <Background color={dark ? '#374151' : '#e5e7eb'} gap={20} />
             <Controls />
             <MiniMap nodeColor={n => minimapColors[n.data?.gender ?? 'unknown'] ?? minimapColors.unknown} />
+            <PrintFitView />
           </ReactFlow>
         ) : (
           treeRootId ? (
             <D3TreeView
+              ref={d3TreeRef}
               data={data}
               rootId={treeRootId}
               mode={treeMode}

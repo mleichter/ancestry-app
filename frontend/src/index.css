@@ -38,16 +38,32 @@ body {
 }
 
 /* ── Print / PDF export ─────────────────────────────────────────────────── */
+@page {
+  size: A4 landscape;
+  margin: 1cm;
+}
+
 @media print {
-  /* Hide everything except the tree canvas */
+  /* Hide nav and all interactive controls */
   nav,
   .print-hide {
     display: none !important;
   }
 
-  /* Remove page padding so the canvas fills the sheet */
-  body { background: white !important; }
-  main { padding: 0 !important; }
+  body, html {
+    background: white !important;
+    height: auto !important;
+  }
+
+  main {
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  /* The outer flex column: let it expand naturally */
+  .print-canvas-wrapper {
+    height: auto !important;
+  }
 
   /* Canvas fills the whole page */
   .print-canvas {
@@ -58,15 +74,16 @@ body {
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    overflow: visible !important;
   }
 
-  /* D3 SVG: fill the page */
+  /* D3 SVG: viewBox is set programmatically; just fill the container */
   .print-canvas svg {
     width: 100% !important;
     height: 100% !important;
   }
 
-  /* ReactFlow: make sure the flow fills too */
+  /* ReactFlow: hide chrome, keep the viewport */
   .react-flow__minimap,
   .react-flow__controls,
   .react-flow__attribution { display: none !important; }
