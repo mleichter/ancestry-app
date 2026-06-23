@@ -52,3 +52,12 @@ export const gedcomApi = {
     return api.post<GedcomImportResult>('/gedcom/import', form).then(r => r.data)
   },
 }
+
+export const exportApi = {
+  jsonExportUrl: () => '/api/v1/export/json',
+  importJson: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post<GedcomImportResult>('/import/json', form).then(r => r.data)
+  },
+}

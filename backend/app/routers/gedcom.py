@@ -1,12 +1,13 @@
 import io
+import json
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models.person import Person
+from app.models.person import Person, GenderEnum
 from app.models.relationship import Relationship, RelationshipType
 
 router = APIRouter(tags=["gedcom"])
@@ -256,6 +257,130 @@ async def import_gedcom(
                         type=RelationshipType.parent_child,
                     ))
                     rels_created += 1
+
+    await db.commit()
+    return {"persons_created": persons_created, "relationships_created": rels_created}
+
+
+# ── JSON export ────────────────────────────────────────────────────────────────
+
+@router.get("/export/json")
+async def export_json(db: AsyncSession = Depends(get_db)):
+    persons = (await db.execute(select(Person))).scalars().all()
+    rels = (await db.execute(select(Relationship))).scalars().all()
+
+    data = {
+        "version": "1.0",
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "persons": [
+            {
+                "id": str(p.id),
+                "first_name": p.first_name,
+                "last_name": p.last_name,
+                "birth_name": p.birth_name,
+                "gender": p.gender.value if p.gender else None,
+                "date_of_birth": p.date_of_birth,
+                "place_of_birth": p.place_of_birth,
+                "date_of_death": p.date_of_death,
+                "place_of_death": p.place_of_death,
+                "is_living": p.is_living,
+                "nationality": p.nationality,
+                "origin": p.origin,
+                "occupations": p.occupations,
+                "biography": p.biography,
+            }
+            for p in persons
+        ],
+        "relationships": [
+            {
+                "id": str(r.id),
+                "person_a_id": str(r.person_a_id),
+                "person_b_id": str(r.person_b_id),
+                "type": r.type.value,
+                "start_date": r.start_date,
+                "end_date": r.end_date,
+                "end_reason": r.end_reason.value if r.end_reason else None,
+                "notes": r.notes,
+            }
+            for r in rels
+        ],
+    }
+
+    body = json.dumps(data, ensure_ascii=False, indent=2)
+    return StreamingResponse(
+        io.BytesIO(body.encode("utf-8")),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=stammbaum.json"},
+    )
+
+
+# ── JSON import ────────────────────────────────────────────────────────────────
+
+@router.post("/import/json")
+async def import_json(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        content = (await file.read()).decode("utf-8-sig")
+        data = json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ungültige JSON-Datei")
+
+    persons_list = data.get("persons", [])
+    rels_list = data.get("relationships", [])
+
+    id_map: dict[str, uuid.UUID] = {}
+    persons_created = 0
+    rels_created = 0
+
+    for pd in persons_list:
+        gender = None
+        if pd.get("gender"):
+            try:
+                gender = GenderEnum(pd["gender"])
+            except ValueError:
+                pass
+
+        p = Person(
+            first_name=pd.get("first_name") or "Unbekannt",
+            last_name=pd.get("last_name") or "Unbekannt",
+            birth_name=pd.get("birth_name"),
+            gender=gender,
+            date_of_birth=pd.get("date_of_birth"),
+            place_of_birth=pd.get("place_of_birth"),
+            date_of_death=pd.get("date_of_death"),
+            place_of_death=pd.get("place_of_death"),
+            is_living=pd.get("is_living", True),
+            nationality=pd.get("nationality"),
+            origin=pd.get("origin"),
+            occupations=pd.get("occupations"),
+            biography=pd.get("biography"),
+        )
+        db.add(p)
+        await db.flush()
+        if pd.get("id"):
+            id_map[pd["id"]] = p.id
+        persons_created += 1
+
+    for rd in rels_list:
+        a_id = id_map.get(rd.get("person_a_id", ""))
+        b_id = id_map.get(rd.get("person_b_id", ""))
+        if not a_id or not b_id:
+            continue
+        try:
+            rel_type = RelationshipType(rd["type"])
+        except (KeyError, ValueError):
+            continue
+        db.add(Relationship(
+            person_a_id=a_id,
+            person_b_id=b_id,
+            type=rel_type,
+            start_date=rd.get("start_date"),
+            end_date=rd.get("end_date"),
+            notes=rd.get("notes"),
+        ))
+        rels_created += 1
 
     await db.commit()
     return {"persons_created": persons_created, "relationships_created": rels_created}

@@ -293,13 +293,15 @@ export default function PersonDetailPage() {
     queryFn: () => personsApi.get(id!),
   })
   const { data: allPersons = [] } = useQuery({ queryKey: ['persons'], queryFn: personsApi.list })
-  const { data: rels = [] } = useQuery({
-    queryKey: ['relationships', id],
-    queryFn: () => relationshipsApi.list(id),
+  const { data: allRels = [] } = useQuery({
+    queryKey: ['relationships'],
+    queryFn: () => relationshipsApi.list(),
   })
+  // Direct relationships of this person (for add/delete management)
+  const rels = allRels.filter(r => r.person_a_id === id || r.person_b_id === id)
 
   const invalidateRels = () => {
-    qc.invalidateQueries({ queryKey: ['relationships', id] })
+    qc.invalidateQueries({ queryKey: ['relationships'] })
     qc.invalidateQueries({ queryKey: ['tree'] })
   }
 
@@ -338,6 +340,18 @@ export default function PersonDetailPage() {
 
   const otherPersons = allPersons.filter(p => p.id !== id)
   const personById = Object.fromEntries(allPersons.map(p => [p.id, p]))
+
+  // Computed relatives
+  const parentIds = allRels.filter(r => r.type === 'parent_child' && r.person_b_id === id).map(r => r.person_a_id)
+  const childIds  = allRels.filter(r => r.type === 'parent_child' && r.person_a_id === id).map(r => r.person_b_id)
+  const partnerIds = allRels
+    .filter(r => r.type === 'partner' && (r.person_a_id === id || r.person_b_id === id))
+    .map(r => r.person_a_id === id ? r.person_b_id : r.person_a_id)
+  const siblingIds = [...new Set(
+    allRels
+      .filter(r => r.type === 'parent_child' && parentIds.includes(r.person_a_id) && r.person_b_id !== id)
+      .map(r => r.person_b_id)
+  )]
 
   const onAddRel = (data: RelFormData) => {
     const payload: RelationshipCreate = {
@@ -413,6 +427,52 @@ export default function PersonDetailPage() {
 
       {/* Photo Gallery */}
       <PhotoGallery personId={id!} />
+
+      {/* Computed Relatives */}
+      {(parentIds.length + childIds.length + partnerIds.length + siblingIds.length) > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+          <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">Verwandte</h2>
+          <div className="space-y-3">
+            {[
+              { label: 'Eltern', ids: parentIds, color: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300' },
+              { label: 'Partner', ids: partnerIds, color: 'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300' },
+              { label: 'Kinder', ids: childIds, color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' },
+              { label: 'Geschwister', ids: siblingIds, color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+            ].filter(g => g.ids.length > 0).map(group => (
+              <div key={group.label} className="flex items-start gap-3">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-1 ${group.color}`}>
+                  {group.label}
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {group.ids.map(pid => {
+                    const p = personById[pid]
+                    if (!p) return null
+                    return (
+                      <Link key={pid} to={`/persons/${pid}`}
+                        className="flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 border border-gray-200 dark:border-gray-700 transition-colors">
+                        {p.avatar_media_id ? (
+                          <img src={mediaApi.fileUrl(p.avatar_media_id)} alt=""
+                            className="w-6 h-6 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">
+                            {p.first_name[0]}{p.last_name[0]}
+                          </div>
+                        )}
+                        <span className="text-sm text-gray-700 dark:text-gray-200">{p.first_name} {p.last_name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Relationship Path Finder */}
+      {allPersons.length > 1 && (
+        <RelPathFinder currentId={id!} allPersons={allPersons} allRels={allRels} />
+      )}
 
       {/* Relationships */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
