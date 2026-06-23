@@ -19,6 +19,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
     security_opt:
       - apparmor=unconfined
 
@@ -37,6 +38,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
     security_opt:
       - apparmor=unconfined
 
@@ -54,6 +56,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     security_opt:
       - apparmor=unconfined
 
