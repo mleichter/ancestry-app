@@ -25,6 +25,8 @@ function nodeVars(gender?: string) {
   const g = GENDER_VARS[gender ?? 'unknown'] ?? 'unknown'
   return { bg: `var(--node-${g}-bg)`, border: `var(--node-${g}-border)` }
 }
+const yearOf = (d: string) => /^\d{4}/.test(d) ? d.slice(0, 4) : d.slice(-4)
+
 const MINIMAP_COLORS_LIGHT: Record<string, string> = {
   male: '#dbeafe', female: '#fce7f3', other: '#e0e7ff', unknown: '#f3f4f6',
 }
@@ -53,8 +55,8 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
         <div className="font-semibold text-gray-800 dark:text-gray-100 text-xs leading-tight">{data.label}</div>
         {(data.date_of_birth || data.date_of_death) && (
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {data.date_of_birth ? `* ${data.date_of_birth.slice(0, 4)}` : ''}
-            {data.date_of_death ? ` † ${data.date_of_death.slice(0, 4)}` : ''}
+            {data.date_of_birth ? `* ${yearOf(data.date_of_birth)}` : ''}
+            {data.date_of_death ? ` † ${yearOf(data.date_of_death)}` : ''}
           </div>
         )}
         {!data.is_living && !data.date_of_death && <div className="text-xs text-gray-400 dark:text-gray-500">✝</div>}

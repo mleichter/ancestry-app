@@ -1,9 +1,134 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { personsApi, relationshipsApi, mediaApi } from '../api/client'
-import type { RelationshipCreate, RelationshipType, MediaItem } from '../types'
+import type { RelationshipCreate, RelationshipType, MediaItem, Person, Relationship } from '../types'
+
+// ── Relationship path finder ──────────────────────────────────────────────────
+
+type StepLabel = 'Kind' | 'Elternteil' | 'Partner'
+interface PathStep { personId: string; via?: StepLabel }
+
+function findRelPath(fromId: string, toId: string, rels: Relationship[]): PathStep[] | null {
+  if (fromId === toId) return [{ personId: fromId }]
+  const adj = new Map<string, { to: string; label: StepLabel }[]>()
+  const ensure = (id: string) => { if (!adj.has(id)) adj.set(id, []) }
+  for (const rel of rels) {
+    const a = rel.person_a_id, b = rel.person_b_id
+    ensure(a); ensure(b)
+    if (rel.type === 'parent_child') {
+      adj.get(a)!.push({ to: b, label: 'Kind' })
+      adj.get(b)!.push({ to: a, label: 'Elternteil' })
+    } else {
+      adj.get(a)!.push({ to: b, label: 'Partner' })
+      adj.get(b)!.push({ to: a, label: 'Partner' })
+    }
+  }
+  const visited = new Set([fromId])
+  const parent = new Map<string, { prev: string; label: StepLabel }>()
+  const queue = [fromId]
+  while (queue.length) {
+    const cur = queue.shift()!
+    if (cur === toId) {
+      const steps: PathStep[] = []
+      let node = toId
+      while (node !== fromId) {
+        const p = parent.get(node)!
+        steps.unshift({ personId: node, via: p.label })
+        node = p.prev
+      }
+      steps.unshift({ personId: fromId })
+      return steps
+    }
+    for (const edge of adj.get(cur) ?? []) {
+      if (!visited.has(edge.to)) {
+        visited.add(edge.to)
+        parent.set(edge.to, { prev: cur, label: edge.label })
+        queue.push(edge.to)
+      }
+    }
+  }
+  return null
+}
+
+const STEP_COLOR: Record<StepLabel, string> = {
+  Kind:      'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  Elternteil:'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  Partner:   'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300',
+}
+
+function RelPathFinder({ currentId, allPersons, allRels }: {
+  currentId: string
+  allPersons: Person[]
+  allRels: Relationship[]
+}) {
+  const [targetId, setTargetId] = useState('')
+  const others = allPersons.filter(p => p.id !== currentId)
+    .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+  const personById = useMemo(
+    () => Object.fromEntries(allPersons.map(p => [p.id, p])),
+    [allPersons]
+  )
+  const path = useMemo(
+    () => targetId ? findRelPath(currentId, targetId, allRels) : null,
+    [currentId, targetId, allRels]
+  )
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+      <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">Verwandtschaftsweg</h2>
+      <select
+        value={targetId}
+        onChange={e => setTargetId(e.target.value)}
+        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 mb-4"
+      >
+        <option value="">– Person auswählen –</option>
+        {others.map(p => (
+          <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+        ))}
+      </select>
+
+      {targetId && path === null && (
+        <p className="text-sm text-gray-400 dark:text-gray-500">Keine Verbindung gefunden.</p>
+      )}
+
+      {path && path.length > 1 && (
+        <div className="flex items-center flex-wrap gap-1">
+          {path.map((step, i) => {
+            const p = personById[step.personId]
+            const name = p ? `${p.first_name} ${p.last_name}` : step.personId
+            return (
+              <span key={i} className="flex items-center gap-1">
+                {step.via && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STEP_COLOR[step.via]}`}>
+                    {step.via}
+                  </span>
+                )}
+                <Link
+                  to={`/persons/${step.personId}`}
+                  className={`text-sm font-medium ${
+                    step.personId === currentId || step.personId === targetId
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-gray-700 dark:text-gray-200 hover:text-indigo-500 dark:hover:text-indigo-300'
+                  }`}
+                >
+                  {name}
+                </Link>
+                {i < path.length - 1 && <span className="text-gray-300 dark:text-gray-600">→</span>}
+              </span>
+            )
+          })}
+        </div>
+      )}
+      {path && path.length > 1 && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+          {path.length - 1} Schritt{path.length - 1 !== 1 ? 'e' : ''} entfernt
+        </p>
+      )}
+    </div>
+  )
+}
 
 function MapsLink({ place }: { place: string }) {
   const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`

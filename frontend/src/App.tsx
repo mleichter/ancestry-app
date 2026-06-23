@@ -5,6 +5,8 @@ import PersonDetailPage from './pages/PersonDetailPage'
 import TreePage from './pages/TreePage'
 import TimelinePage from './pages/TimelinePage'
 import GedcomPage from './pages/GedcomPage'
+import DashboardPage from './pages/DashboardPage'
+import SurnamesPage from './pages/SurnamesPage'
 
 function Nav() {
   const cls = ({ isActive }: { isActive: boolean }) =>
@@ -16,9 +18,11 @@ function Nav() {
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center gap-2 shadow-sm flex-wrap">
       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mr-4">🌳 Stammbaum</span>
+      <NavLink to="/" end className={cls}>Übersicht</NavLink>
       <NavLink to="/persons" className={cls}>Personen</NavLink>
       <NavLink to="/tree" className={cls}>Stammbaum</NavLink>
       <NavLink to="/timeline" className={cls}>Zeitleiste</NavLink>
+      <NavLink to="/surnames" className={cls}>Familien</NavLink>
       <NavLink to="/gedcom" className={cls}>GEDCOM</NavLink>
     </nav>
   )
@@ -31,13 +35,14 @@ export default function App() {
         <Nav />
         <main className="flex-1 p-6">
           <Routes>
-            <Route path="/" element={<TreePage />} />
+            <Route path="/" element={<DashboardPage />} />
             <Route path="/persons" element={<PersonListPage />} />
             <Route path="/persons/new" element={<PersonFormPage />} />
             <Route path="/persons/:id" element={<PersonDetailPage />} />
             <Route path="/persons/:id/edit" element={<PersonFormPage />} />
             <Route path="/tree" element={<TreePage />} />
             <Route path="/timeline" element={<TimelinePage />} />
+            <Route path="/surnames" element={<SurnamesPage />} />
             <Route path="/gedcom" element={<GedcomPage />} />
           </Routes>
         </main>

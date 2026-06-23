@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { personsApi, relationshipsApi } from '../api/client'
 import type { Person, Relationship } from '../types'
 
+const yearInt = (d: string) => parseInt(/^\d{4}/.test(d) ? d : d.slice(-4))
+
 type EventType = 'birth' | 'death' | 'union' | 'separation'
 
 interface TimelineEvent {
@@ -64,10 +66,10 @@ export default function TimelinePage() {
 
     for (const p of persons) {
       if (p.date_of_birth) {
-        evs.push({ date: p.date_of_birth, year: parseInt(p.date_of_birth), type: 'birth', person: p, place: p.place_of_birth })
+        evs.push({ date: p.date_of_birth, year: yearInt(p.date_of_birth), type: 'birth', person: p, place: p.place_of_birth })
       }
       if (p.date_of_death) {
-        evs.push({ date: p.date_of_death, year: parseInt(p.date_of_death), type: 'death', person: p, place: p.place_of_death })
+        evs.push({ date: p.date_of_death, year: yearInt(p.date_of_death), type: 'death', person: p, place: p.place_of_death })
       }
     }
 
@@ -76,10 +78,10 @@ export default function TimelinePage() {
       const a = personById[rel.person_a_id]
       const b = personById[rel.person_b_id]
       if (rel.start_date) {
-        evs.push({ date: rel.start_date, year: parseInt(rel.start_date), type: 'union', personA: a, personB: b, notes: rel.notes || undefined })
+        evs.push({ date: rel.start_date, year: yearInt(rel.start_date), type: 'union', personA: a, personB: b, notes: rel.notes || undefined })
       }
       if (rel.end_date) {
-        evs.push({ date: rel.end_date, year: parseInt(rel.end_date), type: 'separation', personA: a, personB: b })
+        evs.push({ date: rel.end_date, year: yearInt(rel.end_date), type: 'separation', personA: a, personB: b })
       }
     }
 
