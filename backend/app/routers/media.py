@@ -1,8 +1,9 @@
+import io
 import os
 import uuid
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -74,8 +75,28 @@ async def upload_avatar(
     return {"id": str(media.id), "person_id": str(person_id)}
 
 
+THUMB_SIZE = (300, 300)
+
+
+def _thumb_path(original_abs: str) -> str:
+    base, _ = os.path.splitext(original_abs)
+    return base + "_thumb.jpg"
+
+
+def _generate_thumb(original_abs: str, thumb_abs: str) -> None:
+    from PIL import Image
+    with Image.open(original_abs) as img:
+        img = img.convert("RGB")
+        img.thumbnail(THUMB_SIZE, Image.LANCZOS)
+        img.save(thumb_abs, "JPEG", quality=85, optimize=True)
+
+
 @router.get("/media/{media_id}/file")
-async def get_media_file(media_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_media_file(
+    media_id: UUID,
+    thumb: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
     media = await db.get(Media, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
@@ -83,6 +104,17 @@ async def get_media_file(media_id: UUID, db: AsyncSession = Depends(get_db)):
     abs_path = _safe_media_path(settings.media_storage_path, media.file_path)
     if not os.path.exists(abs_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
+
+    if thumb and media.mime_type and media.mime_type.startswith("image/"):
+        thumb_abs = _thumb_path(abs_path)
+        if not os.path.exists(thumb_abs):
+            try:
+                _generate_thumb(abs_path, thumb_abs)
+            except Exception:
+                # Fall back to full image if thumbnail generation fails
+                return FileResponse(abs_path, media_type=media.mime_type)
+        return FileResponse(thumb_abs, media_type="image/jpeg")
+
     return FileResponse(abs_path, media_type=media.mime_type)
 
 

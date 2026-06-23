@@ -36,3 +36,38 @@ body {
   .react-flow__minimap { background: #1f2937 !important; }
   .react-flow__minimap-mask { fill: rgba(17,24,39,0.6); }
 }
+
+/* ── Print / PDF export ─────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the tree canvas */
+  nav,
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Remove page padding so the canvas fills the sheet */
+  body { background: white !important; }
+  main { padding: 0 !important; }
+
+  /* Canvas fills the whole page */
+  .print-canvas {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* D3 SVG: fill the page */
+  .print-canvas svg {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* ReactFlow: make sure the flow fills too */
+  .react-flow__minimap,
+  .react-flow__controls,
+  .react-flow__attribution { display: none !important; }
+}

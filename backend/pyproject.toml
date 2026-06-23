@@ -11,4 +11,5 @@ dependencies = [
     "pydantic-settings>=2.3.0",
     "python-multipart>=0.0.9",
     "aiofiles>=23.2.0",
+    "pillow>=10.0.0",
 ]

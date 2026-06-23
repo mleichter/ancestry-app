@@ -41,7 +41,8 @@ export const mediaApi = {
   deleteMedia: (mediaId: string) => api.delete(`/media/${mediaId}`),
   setAvatar: (personId: string, mediaId: string) =>
     api.patch(`/persons/${personId}/avatar/${mediaId}`).then(r => r.data),
-  fileUrl: (mediaId: string) => `/api/v1/media/${mediaId}/file`,
+  fileUrl: (mediaId: string, opts?: { thumb?: boolean }) =>
+    `/api/v1/media/${mediaId}/file${opts?.thumb ? '?thumb=true' : ''}`,
 }
 
 export const gedcomApi = {

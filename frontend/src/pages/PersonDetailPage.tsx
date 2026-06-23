@@ -223,7 +223,7 @@ function PhotoGallery({ personId }: { personId: string }) {
             <div key={m.id} className="relative group aspect-square cursor-pointer"
               onClick={() => setLightbox(m)}>
               <img
-                src={mediaApi.fileUrl(m.id)}
+                src={mediaApi.fileUrl(m.id, { thumb: true })}
                 alt={m.file_name}
                 className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700"
               />
@@ -374,7 +374,7 @@ export default function PersonDetailPage() {
         <div className="flex items-center gap-4">
           <div className="relative group">
             {person.avatar_media_id ? (
-              <img src={mediaApi.fileUrl(person.avatar_media_id)}
+              <img src={mediaApi.fileUrl(person.avatar_media_id, { thumb: true })}
                 alt={`${person.first_name} ${person.last_name}`}
                 className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600 shadow" />
             ) : (
@@ -463,7 +463,7 @@ export default function PersonDetailPage() {
                       <Link key={pid} to={`/persons/${pid}`}
                         className="flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 border border-gray-200 dark:border-gray-700 transition-colors">
                         {p.avatar_media_id ? (
-                          <img src={mediaApi.fileUrl(p.avatar_media_id)} alt=""
+                          <img src={mediaApi.fileUrl(p.avatar_media_id, { thumb: true })} alt=""
                             className="w-6 h-6 rounded-full object-cover shrink-0" />
                         ) : (
                           <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">

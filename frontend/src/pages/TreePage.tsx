@@ -51,7 +51,7 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
         className="px-3 py-2 rounded-xl border-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow min-w-[130px] max-w-[160px] text-center"
       >
         {data.avatar_media_id && (
-          <img src={mediaApi.fileUrl(data.avatar_media_id)} alt={data.label}
+          <img src={mediaApi.fileUrl(data.avatar_media_id, { thumb: true })} alt={data.label}
             className="w-10 h-10 rounded-full object-cover mx-auto mb-1 border border-white/30 shadow-sm" />
         )}
         <div className="font-semibold text-gray-800 dark:text-gray-100 text-xs leading-tight">{data.label}</div>
@@ -318,7 +318,7 @@ export default function TreePage() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Top bar — view toggle + mode-specific controls */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+      <div className="flex items-center gap-3 mb-3 flex-wrap print-hide">
 
         {/* Graph / Baum toggle */}
         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-full p-0.5 shrink-0">
@@ -387,10 +387,19 @@ export default function TreePage() {
             </button>
           </>
         )}
+
+        {/* PDF button — always visible, pushed to the right */}
+        <button
+          onClick={() => window.print()}
+          className="ml-auto shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          title="Als PDF drucken"
+        >
+          ⬇ PDF
+        </button>
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+      <div className="print-canvas flex-1 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         {viewMode === 'graph' ? (
           <ReactFlow
             nodes={nodes}

@@ -298,7 +298,7 @@ export default function D3TreeView({ data, rootId, mode, onNavigate }: D3TreeVie
               {/* Avatar image (circular clip via foreignObject-free approach) */}
               {n.avatarId && (
                 <image
-                  href={`/api/v1/media/${n.avatarId}/file`}
+                  href={`/api/v1/media/${n.avatarId}/file?thumb=true`}
                   x={7}
                   y={NH / 2 - 18}
                   width={36}
