@@ -64,7 +64,7 @@ export default function SettingsPage() {
         <dl className="space-y-2 text-sm">
           <div className="flex gap-4">
             <dt className="text-gray-500 dark:text-gray-400 w-32 shrink-0">Version</dt>
-            <dd className="text-gray-800 dark:text-gray-200">0.7.0</dd>
+            <dd className="text-gray-800 dark:text-gray-200">{__APP_VERSION__}</dd>
           </div>
           <div className="flex gap-4">
             <dt className="text-gray-500 dark:text-gray-400 w-32 shrink-0">Stack</dt>
