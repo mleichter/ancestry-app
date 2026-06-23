@@ -41,8 +41,10 @@ class Person(Base, TimestampMixin):
         back_populates="person",
     )
     relationships_as_a: Mapped[list["Relationship"]] = relationship(  # type: ignore[name-defined]
-        "Relationship", foreign_keys="[Relationship.person_a_id]", back_populates="person_a"
+        "Relationship", foreign_keys="[Relationship.person_a_id]", back_populates="person_a",
+        passive_deletes=True,
     )
     relationships_as_b: Mapped[list["Relationship"]] = relationship(  # type: ignore[name-defined]
-        "Relationship", foreign_keys="[Relationship.person_b_id]", back_populates="person_b"
+        "Relationship", foreign_keys="[Relationship.person_b_id]", back_populates="person_b",
+        passive_deletes=True,
     )

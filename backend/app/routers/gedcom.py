@@ -199,7 +199,8 @@ async def import_gedcom(
 ):
     """Import persons and family relationships from a GEDCOM 5.5.x file.
 
-    Existing data is not replaced — imported records are added alongside any existing ones.
+    GEDCOM records carry no stable UUIDs, so deduplication is not possible.
+    Re-importing the same file will create duplicate persons.
     Returns counts of created persons and relationships.
     """
     content = (await file.read()).decode('utf-8-sig', errors='replace')
@@ -349,8 +350,9 @@ async def import_json(
 ):
     """Restore persons and relationships from a JSON backup produced by the export endpoint.
 
-    Existing data is not replaced — imported records are added alongside any existing ones.
-    Returns counts of created persons and relationships.
+    Persons whose UUID already exists in the database are skipped (idempotent re-import).
+    Relationships are skipped if both persons already exist and an identical link is present.
+    Returns counts of created and skipped records.
     """
     try:
         content = (await file.read()).decode("utf-8-sig")
@@ -361,11 +363,35 @@ async def import_json(
     persons_list = data.get("persons", [])
     rels_list = data.get("relationships", [])
 
+    # Pre-load existing IDs to avoid round-trips per record
+    existing_person_ids: set[uuid.UUID] = {
+        row for (row,) in (await db.execute(select(Person.id))).all()
+    }
+    existing_rel_keys: set[tuple] = {
+        (row[0], row[1], row[2])
+        for row in (await db.execute(
+            select(Relationship.person_a_id, Relationship.person_b_id, Relationship.type)
+        )).all()
+    }
+
     id_map: dict[str, uuid.UUID] = {}
     persons_created = 0
+    persons_skipped = 0
     rels_created = 0
+    rels_skipped = 0
 
     for pd in persons_list:
+        original_id = pd.get("id")
+        if original_id:
+            try:
+                parsed_id = uuid.UUID(original_id)
+            except ValueError:
+                parsed_id = None
+            if parsed_id and parsed_id in existing_person_ids:
+                id_map[original_id] = parsed_id
+                persons_skipped += 1
+                continue
+
         gender = None
         if pd.get("gender"):
             try:
@@ -386,12 +412,13 @@ async def import_json(
             nationality=pd.get("nationality"),
             origin=pd.get("origin"),
             occupations=pd.get("occupations"),
+            sources=pd.get("sources"),
             biography=pd.get("biography"),
         )
         db.add(p)
         await db.flush()
-        if pd.get("id"):
-            id_map[pd["id"]] = p.id
+        if original_id:
+            id_map[original_id] = p.id
         persons_created += 1
 
     for rd in rels_list:
@@ -402,6 +429,9 @@ async def import_json(
         try:
             rel_type = RelationshipType(rd["type"])
         except (KeyError, ValueError):
+            continue
+        if (a_id, b_id, rel_type) in existing_rel_keys:
+            rels_skipped += 1
             continue
         db.add(Relationship(
             person_a_id=a_id,
@@ -414,4 +444,9 @@ async def import_json(
         rels_created += 1
 
     await db.commit()
-    return {"persons_created": persons_created, "relationships_created": rels_created}
+    return {
+        "persons_created": persons_created,
+        "persons_skipped": persons_skipped,
+        "relationships_created": rels_created,
+        "relationships_skipped": rels_skipped,
+    }
