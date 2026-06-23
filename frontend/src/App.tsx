@@ -8,6 +8,7 @@ import GedcomPage from './pages/GedcomPage'
 import DashboardPage from './pages/DashboardPage'
 import SurnamesPage from './pages/SurnamesPage'
 import SettingsPage from './pages/SettingsPage'
+import { ToastProvider } from './hooks/useToast'
 
 function Nav() {
   const cls = ({ isActive }: { isActive: boolean }) =>
@@ -32,6 +33,7 @@ function Nav() {
 
 export default function App() {
   return (
+    <ToastProvider>
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
         <Nav />
@@ -51,5 +53,6 @@ export default function App() {
         </main>
       </div>
     </BrowserRouter>
+    </ToastProvider>
   )
 }

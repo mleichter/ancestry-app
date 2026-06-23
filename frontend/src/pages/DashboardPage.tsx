@@ -139,6 +139,7 @@ export default function DashboardPage() {
               <div key={p.id} className="flex items-center gap-3 py-1">
                 {p.avatar_media_id ? (
                   <img src={mediaApi.fileUrl(p.avatar_media_id, { thumb: true })} alt=""
+                    loading="lazy"
                     className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600 shrink-0" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-400 dark:text-gray-500 shrink-0">

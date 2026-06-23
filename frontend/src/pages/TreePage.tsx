@@ -52,6 +52,7 @@ function PersonNode({ data }: { data: TreeNode & { onClick: () => void } }) {
       >
         {data.avatar_media_id && (
           <img src={mediaApi.fileUrl(data.avatar_media_id, { thumb: true })} alt={data.label}
+            loading="lazy"
             className="w-10 h-10 rounded-full object-cover mx-auto mb-1 border border-white/30 shadow-sm" />
         )}
         <div className="font-semibold text-gray-800 dark:text-gray-100 text-xs leading-tight">{data.label}</div>

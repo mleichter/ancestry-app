@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { personsApi, mediaApi } from '../api/client'
+import { useToast, apiErrMsg } from '../hooks/useToast'
 
 const GENDER_LABEL: Record<string, string> = {
   male: 'männlich', female: 'weiblich', other: 'divers', unknown: 'unbekannt',
@@ -20,6 +21,7 @@ const yearOf = (d?: string) => d ? parseInt(/^\d{4}/.test(d) ? d : d.slice(-4)) 
 
 export default function PersonListPage() {
   const qc = useQueryClient()
+  const { addToast } = useToast()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('name_asc')
 
@@ -32,7 +34,9 @@ export default function PersonListPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['persons'] })
       qc.invalidateQueries({ queryKey: ['tree'] })
+      addToast('Person gelöscht.', 'success')
     },
+    onError: (err) => addToast(apiErrMsg(err, 'Person konnte nicht gelöscht werden.'), 'error'),
   })
 
   const filtered = useMemo(() => {
@@ -123,6 +127,7 @@ export default function PersonListPage() {
               className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
               {p.avatar_media_id ? (
                 <img src={mediaApi.fileUrl(p.avatar_media_id, { thumb: true })} alt=""
+                  loading="lazy"
                   className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600 shrink-0" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm font-medium shrink-0">

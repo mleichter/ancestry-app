@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { personsApi } from '../api/client'
+import { useToast, apiErrMsg } from '../hooks/useToast'
 import type { PersonCreate } from '../types'
 
 const dateField = z
@@ -82,6 +83,7 @@ export default function PersonFormPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isEdit = Boolean(id)
+  const { addToast } = useToast()
   const [occupations, setOccupations] = useState<string[]>([])
 
   const { data: existing } = useQuery({
@@ -105,10 +107,12 @@ export default function PersonFormPage() {
   const createMutation = useMutation({
     mutationFn: (data: PersonCreate) => personsApi.create(data),
     onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${p.id}`) },
+    onError: (err) => addToast(apiErrMsg(err, 'Person konnte nicht angelegt werden.'), 'error'),
   })
   const updateMutation = useMutation({
     mutationFn: (data: Partial<PersonCreate>) => personsApi.update(id!, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${id}`) },
+    onError: (err) => addToast(apiErrMsg(err, 'Änderungen konnten nicht gespeichert werden.'), 'error'),
   })
 
   const onSubmit = (data: FormData) => {

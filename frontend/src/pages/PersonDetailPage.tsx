@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { personsApi, relationshipsApi, mediaApi } from '../api/client'
+import { useToast, apiErrMsg } from '../hooks/useToast'
 import type { RelationshipCreate, RelationshipType, MediaItem, Person, Relationship } from '../types'
 
 // ── Relationship path finder ──────────────────────────────────────────────────
@@ -164,6 +165,7 @@ type RelFormData = {
 
 function PhotoGallery({ personId }: { personId: string }) {
   const qc = useQueryClient()
+  const { addToast } = useToast()
   const photoRef = useRef<HTMLInputElement>(null)
   const [lightbox, setLightbox] = useState<MediaItem | null>(null)
 
@@ -180,6 +182,7 @@ function PhotoGallery({ personId }: { personId: string }) {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => mediaApi.uploadPhoto(personId, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['media', personId] }),
+    onError: (err) => addToast(apiErrMsg(err, 'Foto konnte nicht hochgeladen werden.'), 'error'),
   })
 
   const deleteMutation = useMutation({
@@ -190,6 +193,7 @@ function PhotoGallery({ personId }: { personId: string }) {
       qc.invalidateQueries({ queryKey: ['tree'] })
       setLightbox(null)
     },
+    onError: (err) => addToast(apiErrMsg(err, 'Foto konnte nicht gelöscht werden.'), 'error'),
   })
 
   const setAvatarMutation = useMutation({
@@ -198,6 +202,7 @@ function PhotoGallery({ personId }: { personId: string }) {
       qc.invalidateQueries({ queryKey: ['persons', personId] })
       qc.invalidateQueries({ queryKey: ['tree'] })
     },
+    onError: (err) => addToast(apiErrMsg(err, 'Avatar konnte nicht gesetzt werden.'), 'error'),
   })
 
   return (
@@ -225,6 +230,7 @@ function PhotoGallery({ personId }: { personId: string }) {
               <img
                 src={mediaApi.fileUrl(m.id, { thumb: true })}
                 alt={m.file_name}
+                loading="lazy"
                 className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700"
               />
               {person?.avatar_media_id === m.id && (
@@ -285,6 +291,7 @@ export default function PersonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { addToast } = useToast()
   const [showRelForm, setShowRelForm] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -312,14 +319,17 @@ export default function PersonDetailPage() {
       qc.invalidateQueries({ queryKey: ['tree'] })
       navigate('/persons')
     },
+    onError: (err) => addToast(apiErrMsg(err, 'Person konnte nicht gelöscht werden.'), 'error'),
   })
   const addRelMutation = useMutation({
     mutationFn: (data: RelationshipCreate) => relationshipsApi.create(data),
     onSuccess: () => { invalidateRels(); setShowRelForm(false) },
+    onError: (err) => addToast(apiErrMsg(err, 'Beziehung konnte nicht hinzugefügt werden.'), 'error'),
   })
   const deleteRelMutation = useMutation({
     mutationFn: (relId: string) => relationshipsApi.delete(relId),
     onSuccess: invalidateRels,
+    onError: (err) => addToast(apiErrMsg(err, 'Beziehung konnte nicht gelöscht werden.'), 'error'),
   })
   const uploadAvatarMutation = useMutation({
     mutationFn: (file: File) => mediaApi.uploadAvatar(id!, file),
@@ -328,6 +338,7 @@ export default function PersonDetailPage() {
       qc.invalidateQueries({ queryKey: ['media', id] })
       qc.invalidateQueries({ queryKey: ['tree'] })
     },
+    onError: (err) => addToast(apiErrMsg(err, 'Avatar konnte nicht hochgeladen werden.'), 'error'),
   })
 
   const { register, handleSubmit, reset, watch } = useForm<RelFormData>({
@@ -376,6 +387,7 @@ export default function PersonDetailPage() {
             {person.avatar_media_id ? (
               <img src={mediaApi.fileUrl(person.avatar_media_id, { thumb: true })}
                 alt={`${person.first_name} ${person.last_name}`}
+                loading="lazy"
                 className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600 shadow" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500 text-xl font-medium">
@@ -464,6 +476,7 @@ export default function PersonDetailPage() {
                         className="flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 border border-gray-200 dark:border-gray-700 transition-colors">
                         {p.avatar_media_id ? (
                           <img src={mediaApi.fileUrl(p.avatar_media_id, { thumb: true })} alt=""
+                            loading="lazy"
                             className="w-6 h-6 rounded-full object-cover shrink-0" />
                         ) : (
                           <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">

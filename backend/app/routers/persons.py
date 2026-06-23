@@ -12,7 +12,7 @@ router = APIRouter(prefix="/persons", tags=["persons"])
 @router.get("", response_model=list[PersonResponse])
 async def list_persons(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Person).offset(skip).limit(limit))
