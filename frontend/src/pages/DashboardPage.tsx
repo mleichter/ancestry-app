@@ -2,8 +2,67 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { personsApi, relationshipsApi, mediaApi } from '../api/client'
+import type { Person, Relationship } from '../types'
 
 const yearInt = (d: string) => parseInt(/^\d{4}/.test(d) ? d : d.slice(-4))
+
+function daysUntil(monthDay: string): number {
+  // monthDay format: "MM-DD"
+  const [m, d] = monthDay.split('-').map(Number)
+  const today = new Date()
+  let next = new Date(today.getFullYear(), m - 1, d)
+  if (next.getTime() - today.setHours(0,0,0,0) < 0) next = new Date(today.getFullYear() + 1, m - 1, d)
+  return Math.round((next.getTime() - new Date().setHours(0,0,0,0)) / 86400000)
+}
+
+interface UpcomingEvent { type: 'birthday' | 'anniversary'; label: string; personId: string; days: number; date: string }
+
+function useUpcomingEvents(persons: Person[], rels: Relationship[]): UpcomingEvent[] {
+  return useMemo(() => {
+    const events: UpcomingEvent[] = []
+    const personById = Object.fromEntries(persons.map(p => [p.id, p]))
+
+    for (const p of persons) {
+      if (!p.date_of_birth || p.date_of_birth.length < 7) continue
+      const parts = p.date_of_birth.split('-')
+      if (parts.length < 2) continue
+      const monthDay = parts.slice(1, 3).join('-').padEnd(5, '01').slice(0, 5)
+      const days = daysUntil(monthDay)
+      if (days <= 30) {
+        events.push({
+          type: 'birthday',
+          label: `${p.first_name} ${p.last_name}`,
+          personId: p.id,
+          days,
+          date: monthDay,
+        })
+      }
+    }
+
+    for (const r of rels) {
+      if (r.type !== 'partner' || !r.start_date || r.start_date.length < 7) continue
+      const parts = r.start_date.split('-')
+      if (parts.length < 2) continue
+      const monthDay = parts.slice(1, 3).join('-').padEnd(5, '01').slice(0, 5)
+      const days = daysUntil(monthDay)
+      if (days <= 30) {
+        const a = personById[r.person_a_id]
+        const b = personById[r.person_b_id]
+        if (a && b) {
+          events.push({
+            type: 'anniversary',
+            label: `${a.first_name} & ${b.first_name} ${b.last_name}`,
+            personId: r.person_a_id,
+            days,
+            date: monthDay,
+          })
+        }
+      }
+    }
+
+    return events.sort((a, b) => a.days - b.days)
+  }, [persons, rels])
+}
 
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
   return (
@@ -62,6 +121,8 @@ export default function DashboardPage() {
 
     return { living, deceased, partners, parent_child, span, topSurnames, maxSurnameCount, topNats, recent }
   }, [persons, rels])
+
+  const upcoming = useUpcomingEvents(persons, rels)
 
   if (persons.length === 0) {
     return (
@@ -180,6 +241,34 @@ export default function DashboardPage() {
                 className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-full text-sm text-indigo-700 dark:text-indigo-300">
                 {nat} <span className="text-indigo-400 dark:text-indigo-500 ml-1">{count}</span>
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming birthdays & anniversaries */}
+      {upcoming.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+          <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">Anstehende Ereignisse (30 Tage)</h2>
+          <div className="space-y-2">
+            {upcoming.map((ev, i) => (
+              <Link key={i} to={`/persons/${ev.personId}`}
+                className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg px-2 py-1.5 transition-colors">
+                <span className="text-lg shrink-0">{ev.type === 'birthday' ? '🎂' : '💍'}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{ev.label}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                    {ev.type === 'birthday' ? 'Geburtstag' : 'Jahrestag'}
+                  </span>
+                </div>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                  ev.days === 0 ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400'
+                  : ev.days <= 7 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                }`}>
+                  {ev.days === 0 ? 'Heute' : `in ${ev.days} Tag${ev.days !== 1 ? 'en' : ''}`}
+                </span>
+              </Link>
             ))}
           </div>
         </div>

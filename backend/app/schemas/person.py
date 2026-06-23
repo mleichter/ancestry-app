@@ -18,6 +18,7 @@ class PersonBase(BaseModel):
     nationality: Optional[str] = None
     origin: Optional[str] = None
     occupations: Optional[list] = None
+    sources: Optional[list] = None
     biography: Optional[str] = None
 
 
@@ -38,6 +39,7 @@ class PersonUpdate(BaseModel):
     nationality: Optional[str] = None
     origin: Optional[str] = None
     occupations: Optional[list] = None
+    sources: Optional[list] = None
     biography: Optional[str] = None
 
 

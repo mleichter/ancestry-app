@@ -28,6 +28,7 @@ class Person(Base, TimestampMixin):
     nationality: Mapped[str | None] = mapped_column(String(100))
     origin: Mapped[str | None] = mapped_column(String(200))
     occupations: Mapped[list | None] = mapped_column(JSON)
+    sources: Mapped[list | None] = mapped_column(JSON)
     biography: Mapped[str | None] = mapped_column(Text)
     avatar_media_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("media.id", use_alter=True, name="fk_persons_avatar_media_id"),

@@ -8,6 +8,7 @@ import GedcomPage from './pages/GedcomPage'
 import DashboardPage from './pages/DashboardPage'
 import SurnamesPage from './pages/SurnamesPage'
 import SettingsPage from './pages/SettingsPage'
+import SearchPage from './pages/SearchPage'
 import { ToastProvider } from './hooks/useToast'
 
 function Nav() {
@@ -26,6 +27,7 @@ function Nav() {
       <NavLink to="/timeline" className={cls}>Zeitleiste</NavLink>
       <NavLink to="/surnames" className={cls}>Familien</NavLink>
       <NavLink to="/gedcom" className={cls}>GEDCOM</NavLink>
+      <NavLink to="/search" className={cls}>Suche</NavLink>
       <NavLink to="/settings" className={cls}>Einstellungen</NavLink>
     </nav>
   )
@@ -48,6 +50,7 @@ export default function App() {
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/surnames" element={<SurnamesPage />} />
             <Route path="/gedcom" element={<GedcomPage />} />
+            <Route path="/search" element={<SearchPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>

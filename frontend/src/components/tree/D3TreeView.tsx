@@ -221,6 +221,37 @@ export default function D3TreeView({ data, rootId, mode, onNavigate }: D3TreeVie
     return () => { svg.on('.zoom', null) }
   }, [nodes])
 
+  function downloadSVG() {
+    const svgEl = svgRef.current
+    if (!svgEl || nodes.length === 0) return
+
+    const xs = nodes.map(n => n.x)
+    const ys = nodes.map(n => n.y)
+    const minX = Math.min(...xs) - 32
+    const maxX = Math.max(...xs) + NW + 32
+    const minY = Math.min(...ys) - 32
+    const maxY = Math.max(...ys) + NH + 32
+    const w = maxX - minX
+    const h = maxY - minY
+
+    const clone = svgEl.cloneNode(true) as SVGSVGElement
+    clone.setAttribute('viewBox', `${minX} ${minY} ${w} ${h}`)
+    clone.setAttribute('width', String(w))
+    clone.setAttribute('height', String(h))
+    clone.setAttribute('font-family', 'system-ui, -apple-system, sans-serif')
+    // Strip zoom transform so the content renders at full scale
+    const g = clone.querySelector('g')
+    if (g) g.removeAttribute('transform')
+
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'stammbaum.svg'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -232,6 +263,14 @@ export default function D3TreeView({ data, rootId, mode, onNavigate }: D3TreeVie
   const bgColor = dark ? '#111827' : '#f9fafb'
 
   return (
+    <div className="relative w-full h-full">
+    <button
+      onClick={downloadSVG}
+      title="Als SVG herunterladen"
+      className="absolute top-3 right-3 z-10 px-3 py-1.5 text-xs bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm backdrop-blur-sm"
+    >
+      SVG ↓
+    </button>
     <svg
       ref={svgRef}
       className="w-full h-full cursor-grab active:cursor-grabbing select-none"
@@ -347,5 +386,6 @@ export default function D3TreeView({ data, rootId, mode, onNavigate }: D3TreeVie
         })}
       </g>
     </svg>
+    </div>
   )
 }

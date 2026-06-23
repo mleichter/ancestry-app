@@ -16,6 +16,7 @@ export interface Person {
   nationality?: string
   origin?: string
   occupations?: string[]
+  sources?: string[]
   biography?: string
   avatar_media_id?: string
   created_at: string

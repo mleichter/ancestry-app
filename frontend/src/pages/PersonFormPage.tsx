@@ -8,6 +8,42 @@ import { personsApi } from '../api/client'
 import { useToast, apiErrMsg } from '../hooks/useToast'
 import type { PersonCreate } from '../types'
 
+function SourcesEditor({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  const add = () => {
+    const t = draft.trim()
+    if (t && !value.includes(t)) { onChange([...value, t]); setDraft('') }
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="Quelle eingeben + Enter (z.B. Kirchenbuch München 1842)"
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none"
+        />
+        <button type="button" onClick={add}
+          className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-gray-600">
+          +
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div className="space-y-1">
+          {value.map((src, i) => (
+            <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+              <span className="flex-1 truncate">📄 {src}</span>
+              <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))}
+                className="text-amber-400 hover:text-amber-700 dark:hover:text-amber-200 shrink-0">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const dateField = z
   .string()
   .refine(v => !v || /^\d{4}(-\d{2}(-\d{2})?)?$/.test(v), {
@@ -85,11 +121,19 @@ export default function PersonFormPage() {
   const isEdit = Boolean(id)
   const { addToast } = useToast()
   const [occupations, setOccupations] = useState<string[]>([])
+  const [sources, setSources] = useState<string[]>([])
+  const [dupWarning, setDupWarning] = useState<string | null>(null)
+  const [pendingPayload, setPendingPayload] = useState<PersonCreate | Partial<PersonCreate> | null>(null)
 
   const { data: existing } = useQuery({
     queryKey: ['persons', id],
     queryFn: () => personsApi.get(id!),
     enabled: isEdit,
+  })
+  const { data: allPersons = [] } = useQuery({
+    queryKey: ['persons'],
+    queryFn: personsApi.list,
+    enabled: !isEdit,
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
@@ -101,6 +145,7 @@ export default function PersonFormPage() {
     if (existing) {
       reset({ ...existing, gender: existing.gender ?? undefined })
       setOccupations(existing.occupations ?? [])
+      setSources(existing.sources ?? [])
     }
   }, [existing, reset])
 
@@ -115,11 +160,38 @@ export default function PersonFormPage() {
     onError: (err) => addToast(apiErrMsg(err, 'Änderungen konnten nicht gespeichert werden.'), 'error'),
   })
 
+  const submitPayload = (payload: PersonCreate | Partial<PersonCreate>) => {
+    setPendingPayload(null)
+    setDupWarning(null)
+    if (isEdit) updateMutation.mutate(payload as Partial<PersonCreate>)
+    else createMutation.mutate(payload as PersonCreate)
+  }
+
   const onSubmit = (data: FormData) => {
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== '' && v !== undefined))
-    const payload = { ...clean, ...(occupations.length > 0 ? { occupations } : {}) }
-    if (isEdit) updateMutation.mutate(payload as Partial<PersonCreate>)
-    else createMutation.mutate(payload as unknown as PersonCreate)
+    const payload = {
+      ...clean,
+      ...(occupations.length > 0 ? { occupations } : {}),
+      ...(sources.length > 0 ? { sources } : {}),
+    }
+
+    if (!isEdit) {
+      const birthYear = (data.date_of_birth ?? '').slice(0, 4)
+      const dup = allPersons.find(p => {
+        const sameName =
+          p.first_name.toLowerCase() === data.first_name.toLowerCase() &&
+          p.last_name.toLowerCase() === data.last_name.toLowerCase()
+        const sameYear = birthYear && (p.date_of_birth ?? '').startsWith(birthYear)
+        return sameName && (!birthYear || sameYear)
+      })
+      if (dup) {
+        setDupWarning(`${dup.first_name} ${dup.last_name}${dup.date_of_birth ? ` (* ${dup.date_of_birth.slice(0, 4)})` : ''} existiert bereits.`)
+        setPendingPayload(payload as PersonCreate)
+        return
+      }
+    }
+
+    submitPayload(payload as PersonCreate | Partial<PersonCreate>)
   }
 
   const input = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none'
@@ -127,6 +199,24 @@ export default function PersonFormPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">{isEdit ? 'Person bearbeiten' : 'Neue Person'}</h1>
+
+      {dupWarning && pendingPayload && (
+        <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 rounded-xl text-sm text-amber-800 dark:text-amber-300">
+          <p className="font-medium mb-2">Mögliches Duplikat: {dupWarning}</p>
+          <p className="mb-3">Trotzdem anlegen?</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => submitPayload(pendingPayload)}
+              className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium">
+              Ja, anlegen
+            </button>
+            <button type="button" onClick={() => { setDupWarning(null); setPendingPayload(null) }}
+              className="px-4 py-1.5 border border-amber-300 dark:border-amber-700 rounded-lg text-sm">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Vorname *" error={errors.first_name?.message}>
@@ -182,6 +272,9 @@ export default function PersonFormPage() {
         </div>
         <Field label="Berufe">
           <OccupationsEditor value={occupations} onChange={setOccupations} />
+        </Field>
+        <Field label="Quellen">
+          <SourcesEditor value={sources} onChange={setSources} />
         </Field>
         <Field label="Biografie">
           <textarea {...register('biography')} rows={4} className={input + ' resize-none'} />
