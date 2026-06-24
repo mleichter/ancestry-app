@@ -2,7 +2,7 @@ import io
 import os
 import uuid
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,6 +134,7 @@ async def list_person_media(person_id: UUID, db: AsyncSession = Depends(get_db))
             "file_name": m.file_name,
             "media_type": m.media_type.value,
             "mime_type": m.mime_type,
+            "title": m.title,
             "uploaded_at": m.uploaded_at.isoformat() if m.uploaded_at else None,
         }
         for m in items
@@ -175,6 +176,50 @@ async def upload_photo(
         file_path=rel_path,
         media_type=MediaType.photo,
         mime_type=file.content_type,
+    )
+    db.add(media)
+    await db.commit()
+    await db.refresh(media)
+    return {"id": str(media.id), "person_id": str(person_id)}
+
+
+@router.post("/persons/{person_id}/media/document", status_code=201, summary="Upload a document scan", tags=["media"])
+async def upload_document(
+    person_id: UUID,
+    file: UploadFile = File(...),
+    title: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a document scan (passport, birth certificate, etc.) to a person's media gallery."""
+    person = await db.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    settings = get_settings()
+    ext = EXT_BY_MIME.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
+
+    content = await file.read()
+    if len(content) > settings.max_upload_size_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
+
+    media_id = uuid.uuid4()
+    rel_path = f"{person_id}/{media_id}.{ext}"
+    abs_path = _safe_media_path(settings.media_storage_path, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    with open(abs_path, "wb") as fh:
+        fh.write(content)
+
+    media = Media(
+        id=media_id,
+        person_id=person_id,
+        file_name=f"{media_id}.{ext}",
+        file_path=rel_path,
+        media_type=MediaType.document,
+        mime_type=file.content_type,
+        title=title,
     )
     db.add(media)
     await db.commit()
