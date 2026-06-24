@@ -179,7 +179,10 @@ def _parse_result(data: dict, image_bytes: bytes) -> ExtractionResult:
 
 async def extract_from_document(image_bytes: bytes, mime_type: str) -> ExtractionResult:
     settings = get_settings()
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = AsyncOpenAI(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url or None,
+    )
     b64 = base64.b64encode(image_bytes).decode()
 
     response = await client.chat.completions.create(
