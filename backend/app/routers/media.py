@@ -19,6 +19,7 @@ EXT_BY_MIME: dict[str, str] = {
     "image/png": "png",
     "image/webp": "webp",
     "image/gif": "gif",
+    "application/pdf": "pdf",
 }
 
 
@@ -198,7 +199,7 @@ async def upload_document(
     settings = get_settings()
     ext = EXT_BY_MIME.get(file.content_type or "")
     if not ext:
-        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF, PDF allowed")
 
     content = await file.read()
     if len(content) > settings.max_upload_size_mb * 1024 * 1024:

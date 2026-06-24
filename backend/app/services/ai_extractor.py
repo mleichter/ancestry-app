@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+import fitz  # pymupdf
 from openai import AsyncOpenAI
 from PIL import Image
 
@@ -82,6 +83,15 @@ class ExtractionResult:
     fields: dict[str, FieldResult]
     portrait_b64: str | None
     document_type: str | None
+
+
+def pdf_to_image_bytes(pdf_bytes: bytes, dpi: int = 200) -> bytes:
+    """Render the first page of a PDF to JPEG bytes at the given DPI."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    page = doc[0]
+    mat = fitz.Matrix(dpi / 72, dpi / 72)
+    pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
+    return pix.tobytes("jpeg")
 
 
 def _normalize_date(raw: str) -> str | None:

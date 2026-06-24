@@ -54,7 +54,7 @@ async def test_extract_document_bad_mime(async_client, monkeypatch):
     get_settings.cache_clear()
     r = await async_client.post(
         "/api/v1/ai/extract-document",
-        files={"file": ("test.pdf", b"%PDF-1.4", "application/pdf")},
+        files={"file": ("test.docx", b"PK\x03\x04", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
     )
     assert r.status_code == 400
     get_settings.cache_clear()

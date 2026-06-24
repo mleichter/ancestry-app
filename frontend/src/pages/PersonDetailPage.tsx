@@ -287,8 +287,11 @@ function PhotoGallery({ personId }: { personId: string }) {
               {documents.map(m => (
                 <div key={m.id} className="relative group aspect-square cursor-pointer"
                   onClick={() => setLightbox(m)}>
-                  <img src={mediaApi.fileUrl(m.id, { thumb: true })} alt={m.title ?? m.file_name} loading="lazy"
-                    className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                  {m.mime_type === 'application/pdf'
+                    ? <div className="w-full h-full flex items-center justify-center text-4xl rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">📄</div>
+                    : <img src={mediaApi.fileUrl(m.id, { thumb: true })} alt={m.title ?? m.file_name} loading="lazy"
+                        className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                  }
                   {m.title && (
                     <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded-b-lg truncate">
                       {m.title}
@@ -309,11 +312,16 @@ function PhotoGallery({ personId }: { personId: string }) {
         >
           <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-2xl max-w-2xl w-full"
             onClick={e => e.stopPropagation()}>
-            <img
-              src={mediaApi.fileUrl(lightbox.id)}
-              alt={lightbox.file_name}
-              className="w-full object-contain max-h-[70vh]"
-            />
+            {lightbox.mime_type === 'application/pdf'
+              ? <div className="flex flex-col items-center justify-center p-12 gap-4">
+                  <span className="text-8xl">📄</span>
+                  <a href={mediaApi.fileUrl(lightbox.id)} target="_blank" rel="noreferrer"
+                    className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">
+                    PDF öffnen
+                  </a>
+                </div>
+              : <img src={mediaApi.fileUrl(lightbox.id)} alt={lightbox.file_name} className="w-full object-contain max-h-[70vh]" />
+            }
             <div className="p-4 flex items-center justify-between gap-3">
               <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{lightbox.title ?? lightbox.file_name}</span>
               <div className="flex gap-2 shrink-0">

@@ -73,7 +73,7 @@ interface DocumentScanModalProps {
 }
 
 type Step = 'upload' | 'review'
-const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp']
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 
 export function DocumentScanModal({
   personId,
@@ -101,7 +101,7 @@ export function DocumentScanModal({
   const [isDragging, setIsDragging] = useState(false)
 
   const handleFile = (f: File) => {
-    if (!ACCEPTED.includes(f.type)) { setError('Nur JPEG, PNG oder WebP erlaubt.'); return }
+    if (!ACCEPTED.includes(f.type)) { setError('Nur JPEG, PNG, WebP oder PDF erlaubt.'); return }
     setFile(f)
     setFilePreviewUrl(URL.createObjectURL(f))
     setError(null)
@@ -220,7 +220,10 @@ export function DocumentScanModal({
               >
                 {file ? (
                   <div className="space-y-2">
-                    {filePreviewUrl && <img src={filePreviewUrl} alt="Vorschau" className="mx-auto max-h-40 object-contain rounded" />}
+                    {file.type === 'application/pdf'
+                      ? <div className="mx-auto w-16 h-20 flex items-center justify-center text-5xl">📄</div>
+                      : filePreviewUrl && <img src={filePreviewUrl} alt="Vorschau" className="mx-auto max-h-40 object-contain rounded" />
+                    }
                     <p className="text-sm text-gray-600 dark:text-gray-300">{file.name}</p>
                     <p className="text-xs text-gray-400">Klicken zum Ändern</p>
                   </div>
@@ -228,14 +231,14 @@ export function DocumentScanModal({
                   <div className="space-y-2">
                     <div className="text-4xl text-gray-300 dark:text-gray-600">📄</div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Datei hierher ziehen oder klicken</p>
-                    <p className="text-xs text-gray-400">JPEG, PNG, WebP</p>
+                    <p className="text-xs text-gray-400">JPEG, PNG, WebP, PDF</p>
                   </div>
                 )}
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
               />
@@ -260,10 +263,10 @@ export function DocumentScanModal({
           {step === 'review' && result && (
             <div className="space-y-4">
               <div className="flex gap-4 flex-wrap">
-                {filePreviewUrl && (
-                  <img src={filePreviewUrl} alt="Dokument"
-                    className="w-32 h-40 object-cover rounded border border-gray-200 dark:border-gray-700 shrink-0" />
-                )}
+                {file?.type === 'application/pdf'
+                  ? <div className="w-32 h-40 flex items-center justify-center text-6xl rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shrink-0">📄</div>
+                  : filePreviewUrl && <img src={filePreviewUrl} alt="Dokument" className="w-32 h-40 object-cover rounded border border-gray-200 dark:border-gray-700 shrink-0" />
+                }
                 {result.portrait_b64 && (
                   <div className="space-y-1.5">
                     <img src={`data:image/jpeg;base64,${result.portrait_b64}`} alt="Porträt"
