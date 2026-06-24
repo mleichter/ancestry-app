@@ -4,7 +4,7 @@ RUN pip install --no-cache-dir uv
 
 FROM base AS dev
 COPY pyproject.toml .
-RUN uv pip install --system -e .
+RUN uv pip install --system -e ".[test]"
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 8000
