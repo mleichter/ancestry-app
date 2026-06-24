@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import PersonListPage from './pages/PersonListPage'
 import PersonFormPage from './pages/PersonFormPage'
@@ -9,9 +10,17 @@ import DashboardPage from './pages/DashboardPage'
 import SurnamesPage from './pages/SurnamesPage'
 import SettingsPage from './pages/SettingsPage'
 import SearchPage from './pages/SearchPage'
+import LoginPage from './pages/LoginPage'
 import { ToastProvider } from './hooks/useToast'
+import { useAuthState } from './hooks/useAuth'
+import { authApi } from './api/client'
 
-function Nav() {
+interface NavProps {
+  onLogout: () => void
+  showLogout: boolean
+}
+
+function Nav({ onLogout, showLogout }: NavProps) {
   const cls = ({ isActive }: { isActive: boolean }) =>
     `px-4 py-2 rounded font-medium transition-colors text-sm ${
       isActive
@@ -29,16 +38,23 @@ function Nav() {
       <NavLink to="/gedcom" className={cls}>GEDCOM</NavLink>
       <NavLink to="/search" className={cls}>Suche</NavLink>
       <NavLink to="/settings" className={cls}>Einstellungen</NavLink>
+      {showLogout && (
+        <button
+          onClick={onLogout}
+          className="ml-auto text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+        >
+          Abmelden
+        </button>
+      )}
     </nav>
   )
 }
 
-export default function App() {
+function AppRoutes({ onLogout, showLogout }: NavProps) {
   return (
-    <ToastProvider>
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
-        <Nav />
+        <Nav onLogout={onLogout} showLogout={showLogout} />
         <main className="flex-1 p-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
@@ -56,6 +72,31 @@ export default function App() {
         </main>
       </div>
     </BrowserRouter>
+  )
+}
+
+export default function App() {
+  const { token, authEnabled, login, logout, setAuthEnabled } = useAuthState()
+
+  useEffect(() => {
+    authApi.status().then(({ auth_enabled }) => setAuthEnabled(auth_enabled))
+  }, [setAuthEnabled])
+
+  if (authEnabled === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400 text-sm">Laden…</div>
+      </div>
+    )
+  }
+
+  if (authEnabled && !token) {
+    return <LoginPage onLogin={login} />
+  }
+
+  return (
+    <ToastProvider>
+      <AppRoutes onLogout={logout} showLogout={authEnabled} />
     </ToastProvider>
   )
 }
