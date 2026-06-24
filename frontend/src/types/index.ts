@@ -89,9 +89,30 @@ export interface MediaItem {
   id: string
   person_id: string
   file_name: string
-  media_type: string
+  media_type: 'photo' | 'document'
   mime_type: string
+  title?: string
   uploaded_at: string
+}
+
+export type Confidence = 'high' | 'medium' | 'low' | 'none'
+
+export interface FieldResult {
+  value: string | string[] | null
+  confidence: Confidence
+}
+
+export interface ExtractionResult {
+  fields: Record<string, FieldResult>
+  portrait_b64: string | null
+  document_type: string | null
+}
+
+export interface PendingMedia {
+  file: File
+  mediaType: 'photo' | 'document'
+  title?: string
+  setAsAvatar?: boolean
 }
 
 export interface GedcomImportResult {
