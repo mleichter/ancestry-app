@@ -2,10 +2,11 @@ import { useState, useCallback } from 'react'
 
 export interface AppSettings {
   anonymize_living: boolean
+  ai_enabled: boolean
 }
 
 const KEY = 'ancestry_settings'
-const DEFAULTS: AppSettings = { anonymize_living: false }
+const DEFAULTS: AppSettings = { anonymize_living: false, ai_enabled: true }
 
 function load(): AppSettings {
   try {
