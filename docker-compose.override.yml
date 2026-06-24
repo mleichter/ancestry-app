@@ -10,9 +10,12 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      OPENAI_API_KEY: ""       # set your LiteLLM key here
-      OPENAI_BASE_URL: ""      # e.g. http://litellm:4000
+      OPENAI_API_KEY: "sk-bzfasUbS_iiFKzZ2msuVYA"       # set your LiteLLM key here
+      OPENAI_BASE_URL: "http://192.168.178.20:4000"      # e.g. http://litellm:4000
       OPENAI_MODEL: "gpt-4o"  # e.g. claude-sonnet-4-6
+      AUTH_PASSWORD: "AncestryAdmin2026!"
+      AUTH_SECRET_KEY: "2fb96c4dc895fea45d83b5d6e2b8a6c649d5b8001a910e903565cb6f6f4aee07"
+      API_KEY: "sk-ancestry-mcp-key"
     depends_on:
       db:
         condition: service_healthy
