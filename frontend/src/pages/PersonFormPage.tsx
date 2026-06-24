@@ -4,9 +4,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { personsApi } from '../api/client'
+import { personsApi, mediaApi } from '../api/client'
 import { useToast, apiErrMsg } from '../hooks/useToast'
-import type { PersonCreate } from '../types'
+import { DocumentScanModal } from '../components/DocumentScanModal'
+import type { PersonCreate, PendingMedia } from '../types'
 
 function SourcesEditor({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   const [draft, setDraft] = useState('')
@@ -124,6 +125,8 @@ export default function PersonFormPage() {
   const [sources, setSources] = useState<string[]>([])
   const [dupWarning, setDupWarning] = useState<string | null>(null)
   const [pendingPayload, setPendingPayload] = useState<PersonCreate | Partial<PersonCreate> | null>(null)
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
+  const [showScanModal, setShowScanModal] = useState(false)
 
   const { data: existing } = useQuery({
     queryKey: ['persons', id],
@@ -136,7 +139,7 @@ export default function PersonFormPage() {
     enabled: !isEdit,
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { is_living: true },
   })
@@ -151,12 +154,34 @@ export default function PersonFormPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: PersonCreate) => personsApi.create(data),
-    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${p.id}`) },
+    onSuccess: async (p) => {
+      for (const pm of pendingMedia) {
+        if (pm.mediaType === 'document') {
+          await mediaApi.uploadDocument(p.id, pm.file, pm.title)
+        } else {
+          const uploaded = await mediaApi.uploadPhoto(p.id, pm.file)
+          if (pm.setAsAvatar) await mediaApi.setAvatar(p.id, uploaded.id)
+        }
+      }
+      qc.invalidateQueries({ queryKey: ['persons'] })
+      navigate(`/persons/${p.id}`)
+    },
     onError: (err) => addToast(apiErrMsg(err, 'Person konnte nicht angelegt werden.'), 'error'),
   })
   const updateMutation = useMutation({
     mutationFn: (data: Partial<PersonCreate>) => personsApi.update(id!, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['persons'] }); navigate(`/persons/${id}`) },
+    onSuccess: async () => {
+      for (const pm of pendingMedia) {
+        if (pm.mediaType === 'document') {
+          await mediaApi.uploadDocument(id!, pm.file, pm.title)
+        } else {
+          const uploaded = await mediaApi.uploadPhoto(id!, pm.file)
+          if (pm.setAsAvatar) await mediaApi.setAvatar(id!, uploaded.id)
+        }
+      }
+      qc.invalidateQueries({ queryKey: ['persons'] })
+      navigate(`/persons/${id}`)
+    },
     onError: (err) => addToast(apiErrMsg(err, 'Änderungen konnten nicht gespeichert werden.'), 'error'),
   })
 
@@ -194,6 +219,23 @@ export default function PersonFormPage() {
     submitPayload(payload as PersonCreate | Partial<PersonCreate>)
   }
 
+  const handlePrefill = (fields: Partial<PersonCreate>, pending: PendingMedia[]) => {
+    if (fields.first_name) setValue('first_name', fields.first_name as string)
+    if (fields.last_name) setValue('last_name', fields.last_name as string)
+    if (fields.birth_name) setValue('birth_name', fields.birth_name as string)
+    if (fields.gender) setValue('gender', fields.gender as 'male' | 'female' | 'other' | 'unknown')
+    if (fields.date_of_birth) setValue('date_of_birth', fields.date_of_birth as string)
+    if (fields.place_of_birth) setValue('place_of_birth', fields.place_of_birth as string)
+    if (fields.date_of_death) setValue('date_of_death', fields.date_of_death as string)
+    if (fields.place_of_death) setValue('place_of_death', fields.place_of_death as string)
+    if (fields.nationality) setValue('nationality', fields.nationality as string)
+    if (fields.origin) setValue('origin', fields.origin as string)
+    if (fields.biography) setValue('biography', fields.biography as string)
+    if (fields.occupations && Array.isArray(fields.occupations))
+      setOccupations(fields.occupations as string[])
+    setPendingMedia(pending)
+  }
+
   const input = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 focus:border-indigo-400 outline-none'
 
   return (
@@ -216,6 +258,21 @@ export default function PersonFormPage() {
           </div>
         </div>
       )}
+
+      <div className="flex justify-end mb-2 items-center gap-3">
+        {pendingMedia.length > 0 && (
+          <p className="text-xs text-indigo-500 dark:text-indigo-400">
+            {pendingMedia.length} Datei{pendingMedia.length > 1 ? 'en' : ''} werden nach dem Speichern hochgeladen.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowScanModal(true)}
+          className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          Aus Dokument füllen
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -288,6 +345,16 @@ export default function PersonFormPage() {
           </button>
         </div>
       </form>
+
+      {showScanModal && (
+        <DocumentScanModal
+          personId={id ?? ''}
+          currentPerson={existing ?? {}}
+          mode="prefill"
+          onClose={() => setShowScanModal(false)}
+          onPrefill={handlePrefill}
+        />
+      )}
     </div>
   )
 }

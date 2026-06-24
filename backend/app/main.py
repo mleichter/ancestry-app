@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — registers all mappers with SQLAlchemy
-from app.routers import persons, relationships, tree, media, gedcom
+from app.routers import persons, relationships, tree, media, gedcom, ai
 
 app = FastAPI(
     title="Ancestry App",
@@ -22,6 +22,7 @@ app.include_router(relationships.router, prefix="/api/v1")
 app.include_router(tree.router, prefix="/api/v1")
 app.include_router(media.router, prefix="/api/v1")
 app.include_router(gedcom.router, prefix="/api/v1")
+app.include_router(ai.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["system"], summary="Health check")

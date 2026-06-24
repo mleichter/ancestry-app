@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query'
+import { aiApi } from '../api/client'
 import { useSettings } from '../hooks/useSettings'
 
 function Toggle({
@@ -41,6 +43,11 @@ function Toggle({
 
 export default function SettingsPage() {
   const { settings, update } = useSettings()
+  const { data: aiStatus } = useQuery({
+    queryKey: ['ai-status'],
+    queryFn: aiApi.status,
+    staleTime: 60_000,
+  })
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -56,6 +63,23 @@ export default function SettingsPage() {
           description="Namen, Daten und Biografie lebender Personen werden in GEDCOM- und JSON-Exporten durch Platzhalter ersetzt. Beziehungen bleiben erhalten."
           checked={settings.anonymize_living}
           onChange={v => update({ anonymize_living: v })}
+        />
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm mb-6">
+        <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">KI-Analyse</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Automatisches Auslesen von Personendaten aus historischen Dokumenten per OpenAI GPT-4o Vision.
+        </p>
+        <Toggle
+          label="KI-Dokumentenanalyse aktivieren"
+          description={
+            aiStatus?.available === false
+              ? 'Kein API-Schlüssel konfiguriert — bitte OPENAI_API_KEY in der Backend-Umgebung setzen.'
+              : 'Felder beim Dokumenten-Upload automatisch auslesen.'
+          }
+          checked={settings.ai_enabled && (aiStatus?.available ?? true)}
+          onChange={v => update({ ai_enabled: v })}
         />
       </div>
 

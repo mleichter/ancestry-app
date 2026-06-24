@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Person, PersonCreate, Relationship, RelationshipCreate, TreeData, MediaItem, GedcomImportResult } from '../types'
+import type { Person, PersonCreate, Relationship, RelationshipCreate, TreeData, MediaItem, GedcomImportResult, ExtractionResult } from '../types'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -29,12 +29,18 @@ export const mediaApi = {
   uploadAvatar: (personId: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`/persons/${personId}/media/avatar`, form).then(r => r.data)
+    return api.post<{ id: string; person_id: string }>(`/persons/${personId}/media/avatar`, form).then(r => r.data)
   },
   uploadPhoto: (personId: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`/persons/${personId}/media`, form).then(r => r.data)
+    return api.post<{ id: string; person_id: string }>(`/persons/${personId}/media`, form).then(r => r.data)
+  },
+  uploadDocument: (personId: string, file: File, title?: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (title) form.append('title', title)
+    return api.post<{ id: string; person_id: string }>(`/persons/${personId}/media/document`, form).then(r => r.data)
   },
   listPersonMedia: (personId: string) =>
     api.get<MediaItem[]>(`/persons/${personId}/media`).then(r => r.data),
@@ -43,6 +49,15 @@ export const mediaApi = {
     api.patch(`/persons/${personId}/avatar/${mediaId}`).then(r => r.data),
   fileUrl: (mediaId: string, opts?: { thumb?: boolean }) =>
     `/api/v1/media/${mediaId}/file${opts?.thumb ? '?thumb=true' : ''}`,
+}
+
+export const aiApi = {
+  status: () => api.get<{ available: boolean }>('/ai/status').then(r => r.data),
+  extractDocument: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post<ExtractionResult>('/ai/extract-document', form).then(r => r.data)
+  },
 }
 
 export const gedcomApi = {

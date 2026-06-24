@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { personsApi, relationshipsApi, mediaApi } from '../api/client'
 import { useToast, apiErrMsg } from '../hooks/useToast'
+import { DocumentScanModal } from '../components/DocumentScanModal'
 import type { RelationshipCreate, RelationshipType, MediaItem, Person, Relationship } from '../types'
 
 // ── Relationship path finder ──────────────────────────────────────────────────
@@ -168,6 +169,8 @@ function PhotoGallery({ personId }: { personId: string }) {
   const { addToast } = useToast()
   const photoRef = useRef<HTMLInputElement>(null)
   const [lightbox, setLightbox] = useState<MediaItem | null>(null)
+  const [tab, setTab] = useState<'photos' | 'documents'>('photos')
+  const [showScanModal, setShowScanModal] = useState(false)
 
   const { data: media = [] } = useQuery({
     queryKey: ['media', personId],
@@ -178,6 +181,9 @@ function PhotoGallery({ personId }: { personId: string }) {
     queryKey: ['persons', personId],
     queryFn: () => personsApi.get(personId),
   })
+
+  const photos = media.filter(m => m.media_type === 'photo' || !m.media_type)
+  const documents = media.filter(m => m.media_type === 'document')
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => mediaApi.uploadPhoto(personId, file),
@@ -208,39 +214,91 @@ function PhotoGallery({ personId }: { personId: string }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-semibold text-gray-700 dark:text-gray-300">Fotos ({media.length})</h2>
-        <button
-          onClick={() => photoRef.current?.click()}
-          disabled={uploadMutation.isPending}
-          className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
-        >
-          {uploadMutation.isPending ? 'Hochladen…' : '+ Foto hinzufügen'}
-        </button>
-        <input ref={photoRef} type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate(f); e.target.value = '' }} />
-      </div>
-
-      {media.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Noch keine Fotos vorhanden.</p>
-      ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {media.map(m => (
-            <div key={m.id} className="relative group aspect-square cursor-pointer"
-              onClick={() => setLightbox(m)}>
-              <img
-                src={mediaApi.fileUrl(m.id, { thumb: true })}
-                alt={m.file_name}
-                loading="lazy"
-                className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-              />
-              {person?.avatar_media_id === m.id && (
-                <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[9px] px-1 py-0.5 rounded font-medium">
-                  Avatar
-                </span>
-              )}
-            </div>
-          ))}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setTab('photos')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'photos'
+                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            Fotos ({photos.length})
+          </button>
+          <button
+            onClick={() => setTab('documents')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'documents'
+                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            Dokumente ({documents.length})
+          </button>
         </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowScanModal(true)}
+            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Dokument scannen
+          </button>
+          {tab === 'photos' && (
+            <button
+              onClick={() => photoRef.current?.click()}
+              disabled={uploadMutation.isPending}
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
+            >
+              {uploadMutation.isPending ? 'Hochladen…' : '+ Foto hinzufügen'}
+            </button>
+          )}
+        </div>
+      </div>
+      <input ref={photoRef} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate(f); e.target.value = '' }} />
+
+      {tab === 'photos' && (
+        <>
+          {photos.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500">Noch keine Fotos vorhanden.</p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {photos.map(m => (
+                <div key={m.id} className="relative group aspect-square cursor-pointer"
+                  onClick={() => setLightbox(m)}>
+                  <img src={mediaApi.fileUrl(m.id, { thumb: true })} alt={m.file_name} loading="lazy"
+                    className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                  {person?.avatar_media_id === m.id && (
+                    <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[9px] px-1 py-0.5 rounded font-medium">Avatar</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'documents' && (
+        <>
+          {documents.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500">Noch keine Dokumente vorhanden.</p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {documents.map(m => (
+                <div key={m.id} className="relative group aspect-square cursor-pointer"
+                  onClick={() => setLightbox(m)}>
+                  <img src={mediaApi.fileUrl(m.id, { thumb: true })} alt={m.title ?? m.file_name} loading="lazy"
+                    className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                  {m.title && (
+                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded-b-lg truncate">
+                      {m.title}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Lightbox */}
@@ -257,9 +315,9 @@ function PhotoGallery({ personId }: { personId: string }) {
               className="w-full object-contain max-h-[70vh]"
             />
             <div className="p-4 flex items-center justify-between gap-3">
-              <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{lightbox.file_name}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{lightbox.title ?? lightbox.file_name}</span>
               <div className="flex gap-2 shrink-0">
-                {person?.avatar_media_id !== lightbox.id && (
+                {lightbox.media_type === 'photo' && person?.avatar_media_id !== lightbox.id && (
                   <button
                     onClick={() => setAvatarMutation.mutate(lightbox.id)}
                     disabled={setAvatarMutation.isPending}
@@ -269,7 +327,7 @@ function PhotoGallery({ personId }: { personId: string }) {
                   </button>
                 )}
                 <button
-                  onClick={() => { if (confirm('Foto löschen?')) deleteMutation.mutate(lightbox.id) }}
+                  onClick={() => { if (confirm('Datei löschen?')) deleteMutation.mutate(lightbox.id) }}
                   className="px-3 py-1.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50"
                 >
                   Löschen
@@ -282,6 +340,15 @@ function PhotoGallery({ personId }: { personId: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {showScanModal && (
+        <DocumentScanModal
+          personId={personId}
+          currentPerson={person ?? {}}
+          mode="patch"
+          onClose={() => setShowScanModal(false)}
+        />
       )}
     </div>
   )
