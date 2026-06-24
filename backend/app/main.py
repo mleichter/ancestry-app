@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — registers all mappers with SQLAlchemy
-from app.routers import persons, relationships, tree, media, gedcom, ai
+from app.routers import persons, relationships, tree, media, gedcom, ai, auth
 from app.auth import require_auth
 
 app = FastAPI(
@@ -20,6 +20,7 @@ app.add_middleware(
 
 _auth_dep = [Depends(require_auth)]
 
+app.include_router(auth.router, prefix="/api/v1")  # no auth dep — public
 app.include_router(persons.router, prefix="/api/v1", dependencies=_auth_dep)
 app.include_router(relationships.router, prefix="/api/v1", dependencies=_auth_dep)
 app.include_router(tree.router, prefix="/api/v1", dependencies=_auth_dep)
