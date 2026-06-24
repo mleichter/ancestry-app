@@ -186,7 +186,7 @@ async def extract_from_document(image_bytes: bytes, mime_type: str) -> Extractio
     b64 = base64.b64encode(image_bytes).decode()
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model=settings.openai_model,
         response_format={"type": "json_object"},
         max_tokens=1500,
         messages=[{
