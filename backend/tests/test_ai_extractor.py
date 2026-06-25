@@ -183,12 +183,6 @@ def test_detect_face_bbox_plain_image_returns_none():
     assert result is None
 
 
-def test_detect_face_bbox_returns_none_or_valid_bbox():
-    """_detect_face_bbox must complete without raising on a real (blank) image."""
-    result = _detect_face_bbox(_make_image(300, 400))
-    assert result is None  # blank image, no face expected
-
-
 def test_detect_face_bbox_returns_none_on_invalid_bytes():
     """Corrupt input must return None, never raise."""
     result = _detect_face_bbox(b"not-an-image-bytes")

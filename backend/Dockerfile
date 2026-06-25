@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgles2 \
     libegl1 \
     && rm -rf /var/lib/apt/lists/*
+RUN python3 -c "import urllib.request; urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_full_range/float16/latest/blaze_face_full_range.tflite', '/opt/face_detector.tflite')"
 RUN pip install --no-cache-dir uv
 
 FROM base AS dev

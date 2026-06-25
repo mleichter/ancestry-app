@@ -164,22 +164,18 @@ def _crop_portrait(image_bytes: bytes, bbox: list, padding_pct: float = 0.0) -> 
         return None
 
 
+_FACE_DETECTOR_MODEL = "/opt/face_detector.tflite"
+
+
 def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
     """Run MediaPipe Tasks FaceDetector; return [x1%, y1%, x2%, y2%] or None."""
     try:
-        import urllib.request
         import mediapipe as mp
         from mediapipe.tasks.python.vision import FaceDetector, FaceDetectorOptions
         from mediapipe.tasks.python.core.base_options import BaseOptions
         import numpy as np
 
-        model_path = "/tmp/face_detector.tflite"
-        if not os.path.exists(model_path):
-            urllib.request.urlretrieve(
-                "https://storage.googleapis.com/mediapipe-models/face_detector/"
-                "blaze_face_full_range/float16/latest/blaze_face_full_range.tflite",
-                model_path,
-            )
+        model_path = _FACE_DETECTOR_MODEL
 
         with Image.open(io.BytesIO(image_bytes)) as img:
             w, h = img.size
