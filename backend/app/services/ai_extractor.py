@@ -160,28 +160,43 @@ def _crop_portrait(image_bytes: bytes, bbox: list, padding_pct: float = 0.0) -> 
 
 
 def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
-    """Run MediaPipe BlazeFace on the full image; return [x1%, y1%, x2%, y2%] or None."""
+    """Run MediaPipe Tasks FaceDetector; return [x1%, y1%, x2%, y2%] or None."""
     try:
+        import urllib.request
         import mediapipe as mp
+        from mediapipe.tasks.python.vision import FaceDetector, FaceDetectorOptions
+        from mediapipe.tasks.python.core.base_options import BaseOptions
         import numpy as np
 
+        model_path = "/tmp/face_detector.task"
+        if not os.path.exists(model_path):
+            urllib.request.urlretrieve(
+                "https://storage.googleapis.com/mediapipe-models/face_detector/"
+                "blaze_face_short_range/float16/latest/blaze_face_short_range.task",
+                model_path,
+            )
+
         with Image.open(io.BytesIO(image_bytes)) as img:
+            w, h = img.size
             np_rgb = np.array(img.convert("RGB"))
 
-        with mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
-        ) as detector:
-            detections = detector.process(np_rgb).detections
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_rgb)
+        options = FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path=model_path),
+            min_detection_confidence=0.5,
+        )
+        with FaceDetector.create_from_options(options) as detector:
+            result = detector.detect(mp_image)
 
-        if not detections:
+        if not result.detections:
             return None
 
-        best = max(detections, key=lambda d: d.score[0])
-        bb = best.location_data.relative_bounding_box
-        x1 = max(0.0, bb.xmin) * 100
-        y1 = max(0.0, bb.ymin) * 100
-        x2 = min(1.0, bb.xmin + bb.width) * 100
-        y2 = min(1.0, bb.ymin + bb.height) * 100
+        best = max(result.detections, key=lambda d: d.categories[0].score)
+        bb = best.bounding_box
+        x1 = max(0.0, bb.origin_x / w) * 100
+        y1 = max(0.0, bb.origin_y / h) * 100
+        x2 = min(1.0, (bb.origin_x + bb.width) / w) * 100
+        y2 = min(1.0, (bb.origin_y + bb.height) / h) * 100
         return [x1, y1, x2, y2]
     except Exception:
         return None
