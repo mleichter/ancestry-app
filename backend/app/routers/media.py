@@ -2,6 +2,7 @@ import io
 import os
 import uuid
 from uuid import UUID
+import magic
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
@@ -21,6 +22,20 @@ EXT_BY_MIME: dict[str, str] = {
     "image/gif": "gif",
     "application/pdf": "pdf",
 }
+
+IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+DOCUMENT_MIMES = IMAGE_MIMES | {"application/pdf"}
+
+
+def _validate_mime(content: bytes, allowed: set[str]) -> str:
+    """Detect MIME type from file magic bytes and reject if not in allowed set."""
+    detected = magic.from_buffer(content, mime=True)
+    if detected not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed (detected: {detected})",
+        )
+    return detected
 
 
 def _safe_media_path(base: str, rel: str) -> str:
@@ -44,11 +59,9 @@ async def upload_avatar(
         raise HTTPException(status_code=404, detail="Person not found")
 
     settings = get_settings()
-    ext = EXT_BY_MIME.get(file.content_type or "")
-    if not ext:
-        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
-
     content = await file.read()
+    detected_mime = _validate_mime(content, IMAGE_MIMES)
+    ext = EXT_BY_MIME.get(detected_mime, "bin")
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
@@ -67,7 +80,7 @@ async def upload_avatar(
         file_name=f"{media_id}.{ext}",
         file_path=rel_path,
         media_type=MediaType.photo,
-        mime_type=file.content_type,
+        mime_type=detected_mime,
     )
     db.add(media)
 
@@ -154,11 +167,9 @@ async def upload_photo(
         raise HTTPException(status_code=404, detail="Person not found")
 
     settings = get_settings()
-    ext = EXT_BY_MIME.get(file.content_type or "")
-    if not ext:
-        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF allowed")
-
     content = await file.read()
+    detected_mime = _validate_mime(content, IMAGE_MIMES)
+    ext = EXT_BY_MIME.get(detected_mime, "bin")
     if len(content) > settings.max_upload_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
 
@@ -176,7 +187,7 @@ async def upload_photo(
         file_name=f"{media_id}.{ext}",
         file_path=rel_path,
         media_type=MediaType.photo,
-        mime_type=file.content_type,
+        mime_type=detected_mime,
     )
     db.add(media)
     await db.commit()
@@ -197,11 +208,9 @@ async def upload_document(
         raise HTTPException(status_code=404, detail="Person not found")
 
     settings = get_settings()
-    ext = EXT_BY_MIME.get(file.content_type or "")
-    if not ext:
-        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP, GIF, PDF allowed")
-
     content = await file.read()
+    detected_mime = _validate_mime(content, DOCUMENT_MIMES)
+    ext = EXT_BY_MIME.get(detected_mime, "bin")
     if len(content) > settings.max_upload_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb} MB")
 
@@ -219,7 +228,7 @@ async def upload_document(
         file_name=f"{media_id}.{ext}",
         file_path=rel_path,
         media_type=MediaType.document,
-        mime_type=file.content_type,
+        mime_type=detected_mime,
         title=title,
     )
     db.add(media)
