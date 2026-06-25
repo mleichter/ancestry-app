@@ -30,6 +30,11 @@ async def list_relationships(
 @router.post("", response_model=RelationshipResponse, status_code=201, summary="Create a relationship")
 async def create_relationship(data: RelationshipCreate, db: AsyncSession = Depends(get_db)):
     """Link two persons. For `parent_child`, person_a is the parent and person_b is the child."""
+    from app.models.person import Person
+    person_a = await db.get(Person, data.person_a_id)
+    person_b = await db.get(Person, data.person_b_id)
+    if not person_a or not person_b:
+        raise HTTPException(status_code=404, detail="One or both persons not found")
     rel = Relationship(**data.model_dump())
     db.add(rel)
     await db.commit()

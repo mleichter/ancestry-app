@@ -106,3 +106,15 @@ async def test_filter_relationships_by_person(async_client):
 
     r2 = await async_client.get(f"/api/v1/relationships?person_id={bid}")
     assert len(r2.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_relationship_invalid_person_rejected(async_client):
+    """Creating a relationship with a non-existent person should return 404."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    r = await async_client.post("/api/v1/relationships", json={
+        "person_a_id": fake_id,
+        "person_b_id": fake_id,
+        "type": "partner",
+    })
+    assert r.status_code == 404
