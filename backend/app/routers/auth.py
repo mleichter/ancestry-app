@@ -4,12 +4,12 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from app.config import get_settings
+from app.auth import COOKIE_NAME
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-COOKIE_NAME = "access_token"
 COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
 
 
@@ -75,5 +75,5 @@ async def login(body: LoginRequest, response: Response):
 @router.post("/logout", summary="Invalidate session cookie")
 async def logout(response: Response):
     """Clear the auth cookie."""
-    response.delete_cookie(key=COOKIE_NAME, samesite="strict")
+    response.delete_cookie(key=COOKIE_NAME, httponly=True, samesite="strict", path="/")
     return {"detail": "logged out"}
