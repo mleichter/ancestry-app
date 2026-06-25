@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+docker-compose.override.yml
 *.egg-info/
 .venv/
 node_modules/
