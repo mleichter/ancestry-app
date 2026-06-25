@@ -173,15 +173,11 @@ def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
         from mediapipe.tasks.python.core.base_options import BaseOptions
         import numpy as np
 
-        # NOTE: The plan specifies model_selection=1 (full-range), but the
-        # full-range model URL returns HTTP 404 from the mediapipe CDN as of
-        # 2026-06-25. Using short-range model as fallback until the CDN URL
-        # for blaze_face_full_range is available.
-        model_path = "/tmp/face_detector.task"
+        model_path = "/tmp/face_detector.tflite"
         if not os.path.exists(model_path):
             urllib.request.urlretrieve(
                 "https://storage.googleapis.com/mediapipe-models/face_detector/"
-                "blaze_face_short_range/float16/latest/blaze_face_short_range.task",
+                "blaze_face_full_range/float16/latest/blaze_face_full_range.tflite",
                 model_path,
             )
 
