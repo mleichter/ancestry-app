@@ -1,30 +1,35 @@
 import { useState, useCallback } from 'react'
 import { authApi } from '../api/client'
 
-const TOKEN_KEY = 'ancestry_token'
-
 export interface AuthState {
-  token: string | null
+  authenticated: boolean | null
   authEnabled: boolean | null
   login: (password: string) => Promise<void>
-  logout: () => void
-  setAuthEnabled: (v: boolean) => void
+  logout: () => Promise<void>
+  setAuthStatus: (enabled: boolean, authenticated: boolean) => void
 }
 
 export function useAuthState(): AuthState {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY))
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
 
   const login = useCallback(async (password: string) => {
-    const data = await authApi.login(password)
-    localStorage.setItem(TOKEN_KEY, data.access_token)
-    setToken(data.access_token)
+    await authApi.login(password)
+    // Re-fetch status so authenticated flips to true from the cookie
+    const status = await authApi.status()
+    setAuthEnabled(status.auth_enabled)
+    setAuthenticated(status.authenticated)
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    setToken(null)
+  const logout = useCallback(async () => {
+    await authApi.logout()
+    setAuthenticated(false)
   }, [])
 
-  return { token, authEnabled, login, logout, setAuthEnabled }
+  const setAuthStatus = useCallback((enabled: boolean, auth: boolean) => {
+    setAuthEnabled(enabled)
+    setAuthenticated(auth)
+  }, [])
+
+  return { authenticated, authEnabled, login, logout, setAuthStatus }
 }

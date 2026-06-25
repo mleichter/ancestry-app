@@ -1,20 +1,12 @@
 import axios from 'axios'
 import type { Person, PersonCreate, Relationship, RelationshipCreate, TreeData, MediaItem, GedcomImportResult, ExtractionResult } from '../types'
 
-const TOKEN_KEY = 'ancestry_token'
-
 const api = axios.create({
   baseURL: '/api/v1',
+  withCredentials: true,  // send httpOnly cookie on every request
 })
 
-// Attach stored JWT on every request
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-
-// On 401 (not from login itself), clear token and redirect to root
+// On 401 (not from login itself), redirect to root so App re-checks auth status
 api.interceptors.response.use(
   res => res,
   err => {
@@ -22,7 +14,6 @@ api.interceptors.response.use(
       err.response?.status === 401 &&
       !err.config?.url?.includes('/auth/login')
     ) {
-      localStorage.removeItem(TOKEN_KEY)
       window.location.href = '/'
     }
     return Promise.reject(err)
@@ -31,9 +22,11 @@ api.interceptors.response.use(
 
 export const authApi = {
   status: () =>
-    api.get<{ auth_enabled: boolean }>('/auth/status').then(r => r.data),
+    api.get<{ auth_enabled: boolean; authenticated: boolean }>('/auth/status').then(r => r.data),
   login: (password: string) =>
     api.post<{ access_token: string; token_type: string }>('/auth/login', { password }).then(r => r.data),
+  logout: () =>
+    api.post('/auth/logout').then(r => r.data),
 }
 
 export const personsApi = {

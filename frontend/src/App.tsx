@@ -76,13 +76,13 @@ function AppRoutes({ onLogout, showLogout }: NavProps) {
 }
 
 export default function App() {
-  const { token, authEnabled, login, logout, setAuthEnabled } = useAuthState()
+  const { authenticated, authEnabled, login, logout, setAuthStatus } = useAuthState()
 
   useEffect(() => {
-    authApi.status().then(({ auth_enabled }) => setAuthEnabled(auth_enabled))
-  }, [setAuthEnabled])
+    authApi.status().then(({ auth_enabled, authenticated }) => setAuthStatus(auth_enabled, authenticated))
+  }, [setAuthStatus])
 
-  if (authEnabled === null) {
+  if (authEnabled === null || authenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-gray-400 text-sm">Laden…</div>
@@ -90,13 +90,13 @@ export default function App() {
     )
   }
 
-  if (authEnabled && !token) {
+  if (authEnabled && !authenticated) {
     return <LoginPage onLogin={login} />
   }
 
   return (
     <ToastProvider>
-      <AppRoutes onLogout={logout} showLogout={authEnabled} />
+      <AppRoutes onLogout={logout} showLogout={!!authEnabled} />
     </ToastProvider>
   )
 }
