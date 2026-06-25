@@ -1,6 +1,8 @@
 import base64
 import io
 import json
+import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -10,6 +12,8 @@ from openai import AsyncOpenAI
 from PIL import Image
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 PERSON_FIELDS = [
     "first_name", "last_name", "birth_name", "gender",
@@ -156,6 +160,7 @@ def _crop_portrait(image_bytes: bytes, bbox: list, padding_pct: float = 0.0) -> 
             cropped.save(buf, "JPEG", quality=85, optimize=True)
             return base64.b64encode(buf.getvalue()).decode()
     except Exception:
+        logger.warning("_crop_portrait failed", exc_info=True)
         return None
 
 
@@ -168,6 +173,10 @@ def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
         from mediapipe.tasks.python.core.base_options import BaseOptions
         import numpy as np
 
+        # NOTE: The plan specifies model_selection=1 (full-range), but the
+        # full-range model URL returns HTTP 404 from the mediapipe CDN as of
+        # 2026-06-25. Using short-range model as fallback until the CDN URL
+        # for blaze_face_full_range is available.
         model_path = "/tmp/face_detector.task"
         if not os.path.exists(model_path):
             urllib.request.urlretrieve(
@@ -199,6 +208,7 @@ def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
         y2 = min(1.0, (bb.origin_y + bb.height) / h) * 100
         return [x1, y1, x2, y2]
     except Exception:
+        logger.warning("_detect_face_bbox failed", exc_info=True)
         return None
 
 
