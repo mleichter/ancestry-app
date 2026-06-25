@@ -1,7 +1,7 @@
 import base64
 import io
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, call, ANY
 
 import pytest
 from PIL import Image
@@ -107,9 +107,34 @@ def test_parse_result_bad_date_downgrades_confidence():
     assert result.fields["date_of_birth"].confidence == "low"
 
 def test_parse_result_crops_portrait():
+    """portrait_bbox present + face detected → portrait_b64 is set."""
     data = {"document_type": "passport", "fields": _empty_fields(), "portrait_bbox": [10.0, 10.0, 40.0, 40.0]}
-    result = _parse_result(data, _make_image(300, 400))
+    face_bbox = [12.0, 8.0, 38.0, 42.0]
+    with patch("app.services.ai_extractor._detect_face_bbox", return_value=face_bbox):
+        result = _parse_result(data, _make_image(300, 400))
     assert result.portrait_b64 is not None
+
+
+def test_parse_result_no_face_detected_returns_null_portrait():
+    """portrait_bbox present but no face detected → portrait_b64 must be None (no fallback)."""
+    data = {"document_type": "passport", "fields": _empty_fields(), "portrait_bbox": [10.0, 10.0, 40.0, 40.0]}
+    with patch("app.services.ai_extractor._detect_face_bbox", return_value=None):
+        result = _parse_result(data, _make_image(300, 400))
+    assert result.portrait_b64 is None
+
+
+def test_parse_result_uses_face_bbox_not_gpt_bbox():
+    """Crop must use the face-detected bbox, not GPT-4o's bbox, and pass padding_pct=0.30."""
+    gpt_bbox = [5.0, 5.0, 45.0, 45.0]
+    face_bbox = [20.0, 10.0, 60.0, 55.0]
+    data = {"document_type": "passport", "fields": _empty_fields(), "portrait_bbox": gpt_bbox}
+    image = _make_image(300, 400)
+    with patch("app.services.ai_extractor._detect_face_bbox", return_value=face_bbox):
+        with patch("app.services.ai_extractor._crop_portrait", return_value="b64data") as mock_crop:
+            result = _parse_result(data, image)
+    mock_crop.assert_called_once_with(image, face_bbox, padding_pct=0.30)
+    assert result.portrait_b64 == "b64data"
+
 
 def test_parse_result_ignores_invalid_confidence():
     fields = _empty_fields()

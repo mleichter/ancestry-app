@@ -137,14 +137,18 @@ def _normalize_date(raw: str) -> str | None:
     return None
 
 
-def _crop_portrait(image_bytes: bytes, bbox: list) -> str | None:
+def _crop_portrait(image_bytes: bytes, bbox: list, padding_pct: float = 0.0) -> str | None:
     try:
         with Image.open(io.BytesIO(image_bytes)) as img:
             w, h = img.size
-            x1 = max(0, int(bbox[0] / 100 * w))
-            y1 = max(0, int(bbox[1] / 100 * h))
-            x2 = min(w, int(bbox[2] / 100 * w))
-            y2 = min(h, int(bbox[3] / 100 * h))
+            bw = (bbox[2] - bbox[0]) / 100 * w
+            bh = (bbox[3] - bbox[1]) / 100 * h
+            pad_x = bw * padding_pct
+            pad_y = bh * padding_pct
+            x1 = max(0, int(bbox[0] / 100 * w - pad_x))
+            y1 = max(0, int(bbox[1] / 100 * h - pad_y))
+            x2 = min(w, int(bbox[2] / 100 * w + pad_x))
+            y2 = min(h, int(bbox[3] / 100 * h + pad_y))
             if x2 <= x1 or y2 <= y1:
                 return None
             cropped = img.crop((x1, y1, x2, y2)).convert("RGB")
@@ -206,7 +210,9 @@ def _parse_result(data: dict, image_bytes: bytes) -> ExtractionResult:
     portrait_b64 = None
     bbox = data.get("portrait_bbox")
     if isinstance(bbox, list) and len(bbox) == 4:
-        portrait_b64 = _crop_portrait(image_bytes, bbox)
+        face_bbox = _detect_face_bbox(image_bytes)
+        if face_bbox is not None:
+            portrait_b64 = _crop_portrait(image_bytes, face_bbox, padding_pct=0.30)
 
     return ExtractionResult(
         fields=fields,
