@@ -20,7 +20,7 @@ class TokenResponse(BaseModel):
 async def auth_status():
     """Returns whether authentication is enabled on this server."""
     settings = get_settings()
-    return {"auth_enabled": bool(settings.auth_password or settings.api_key)}
+    return {"auth_enabled": bool(settings.auth_password)}
 
 
 @router.post("/login", response_model=TokenResponse, summary="Obtain a JWT")

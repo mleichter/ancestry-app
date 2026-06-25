@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import axios from 'axios'
+import { authApi } from '../api/client'
 
 const TOKEN_KEY = 'ancestry_token'
 
@@ -16,12 +16,9 @@ export function useAuthState(): AuthState {
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
 
   const login = useCallback(async (password: string) => {
-    const res = await axios.post<{ access_token: string; token_type: string }>(
-      '/api/v1/auth/login',
-      { password },
-    )
-    localStorage.setItem(TOKEN_KEY, res.data.access_token)
-    setToken(res.data.access_token)
+    const data = await authApi.login(password)
+    localStorage.setItem(TOKEN_KEY, data.access_token)
+    setToken(data.access_token)
   }, [])
 
   const logout = useCallback(() => {

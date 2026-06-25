@@ -11,10 +11,16 @@ from tests.conftest import *  # noqa: F401,F403
 
 
 @pytest.mark.asyncio
-async def test_persons_open_when_auth_disabled(async_client):
+async def test_persons_open_when_auth_disabled(async_client, monkeypatch):
     """No auth env vars set → /persons returns 200, not 401."""
+    monkeypatch.delenv("AUTH_PASSWORD", raising=False)
+    monkeypatch.delenv("AUTH_SECRET_KEY", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    from app.config import get_settings
+    get_settings.cache_clear()
     r = await async_client.get("/api/v1/persons")
     assert r.status_code == 200
+    get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
@@ -59,10 +65,15 @@ async def test_persons_blocked_with_wrong_api_key(async_client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_auth_status_disabled(async_client):
+async def test_auth_status_disabled(async_client, monkeypatch):
+    monkeypatch.delenv("AUTH_PASSWORD", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    from app.config import get_settings
+    get_settings.cache_clear()
     r = await async_client.get("/api/v1/auth/status")
     assert r.status_code == 200
     assert r.json()["auth_enabled"] is False
+    get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
