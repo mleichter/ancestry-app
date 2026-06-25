@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import uuid
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.models.person import Person
 from app.config import get_settings
 
 router = APIRouter(tags=["media"])
+logger = logging.getLogger(__name__)
 
 # Extension derived from MIME type only — never from user-supplied filename
 EXT_BY_MIME: dict[str, str] = {
@@ -253,8 +255,8 @@ async def delete_media(media_id: UUID, db: AsyncSession = Depends(get_db)):
         abs_path = _safe_media_path(settings.media_storage_path, media.file_path)
         if os.path.exists(abs_path):
             os.remove(abs_path)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("Failed to delete file for media %s: %s", media_id, exc)
 
     await db.delete(media)
     await db.commit()

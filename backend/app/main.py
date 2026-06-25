@@ -1,8 +1,15 @@
+import logging
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — registers all mappers with SQLAlchemy
 from app.routers import persons, relationships, tree, media, gedcom, ai, auth
 from app.auth import require_auth
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
 
 app = FastAPI(
     title="Ancestry App",
