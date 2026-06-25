@@ -137,10 +137,19 @@ async def get_media_file(
 
 
 @router.get("/persons/{person_id}/media", summary="List person media", tags=["media"])
-async def list_person_media(person_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Return all media records (photos) belonging to a person, newest first."""
+async def list_person_media(
+    person_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return media records belonging to a person, newest first. Max 500 per page."""
     result = await db.execute(
-        select(Media).where(Media.person_id == person_id).order_by(Media.uploaded_at.desc())
+        select(Media)
+        .where(Media.person_id == person_id)
+        .order_by(Media.uploaded_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     items = result.scalars().all()
     return [

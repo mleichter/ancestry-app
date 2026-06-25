@@ -67,7 +67,7 @@ export const mediaApi = {
     return api.post<{ id: string; person_id: string }>(`/persons/${personId}/media/document`, form).then(r => r.data)
   },
   listPersonMedia: (personId: string) =>
-    api.get<MediaItem[]>(`/persons/${personId}/media`).then(r => r.data),
+    api.get<MediaItem[]>(`/persons/${personId}/media`, { params: { limit: 500 } }).then(r => r.data),
   deleteMedia: (mediaId: string) => api.delete(`/media/${mediaId}`),
   setAvatar: (personId: string, mediaId: string) =>
     api.patch(`/persons/${personId}/avatar/${mediaId}`).then(r => r.data),
