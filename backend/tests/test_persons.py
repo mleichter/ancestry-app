@@ -126,3 +126,28 @@ async def test_list_persons_limit(async_client):
         await async_client.post("/api/v1/persons", json={"first_name": f"P{i}", "last_name": "Test"})
     r = await async_client.get("/api/v1/persons?limit=3")
     assert len(r.json()) == 3
+
+
+@pytest.mark.asyncio
+async def test_create_person_empty_first_name_rejected(async_client):
+    r = await async_client.post("/api/v1/persons", json={"first_name": "", "last_name": "Müller"})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_person_name_too_long_rejected(async_client):
+    r = await async_client.post("/api/v1/persons", json={"first_name": "A" * 101, "last_name": "B"})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_persons_limit_cap(async_client):
+    """limit > 1000 should be rejected with 422."""
+    r = await async_client.get("/api/v1/persons?limit=9999")
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_persons_negative_skip_rejected(async_client):
+    r = await async_client.get("/api/v1/persons?skip=-1")
+    assert r.status_code == 422

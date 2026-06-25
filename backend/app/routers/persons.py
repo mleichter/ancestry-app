@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -11,14 +11,11 @@ router = APIRouter(prefix="/persons", tags=["persons"])
 
 @router.get("", response_model=list[PersonResponse], summary="List all persons")
 async def list_persons(
-    skip: int = 0,
-    limit: int = 5000,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return all persons in the family tree, ordered by insertion time.
-
-    Use `skip` and `limit` for pagination if needed.
-    """
+    """Return persons in the family tree. Max 1000 per page; use skip for pagination."""
     result = await db.execute(select(Person).offset(skip).limit(limit))
     return result.scalars().all()
 
