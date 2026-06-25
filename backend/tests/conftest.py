@@ -8,6 +8,11 @@ import tempfile
 # Must set env vars before any app modules are imported
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("MEDIA_STORAGE_PATH", tempfile.mkdtemp(prefix="ancestry-test-media-"))
+# External service keys are unset by default; individual tests enable via monkeypatch
+os.environ.pop("AUTH_PASSWORD", None)
+os.environ.pop("AUTH_SECRET_KEY", None)
+os.environ.pop("API_KEY", None)
+os.environ.pop("OPENAI_API_KEY", None)
 
 import pytest
 import pytest_asyncio
