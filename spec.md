@@ -1,7 +1,7 @@
 # Family Tree Application – Project Specification
 
 **Version:** 1.0  
-**Status:** Draft – ready for Agentic Coding handoff  
+**Status:** Implemented (2026-06-25)  
 **Datum:** 2026-06-22
 
 ---
@@ -216,10 +216,11 @@ Alle Endpunkte unter `/api/v1/`. OpenAPI-Dokumentation automatisch via FastAPI u
 ## 6. Nicht-funktionale Anforderungen
 
 ### 6.1 Sicherheit
-- Keine Authentifizierung in v1.0 (single-user, Homelab-intern)
-- Architektur muss Multi-User-Erweiterung ermöglichen (User-Tabelle vorbereiten, JWT-Middleware als Stub)
-- Datei-Upload: MIME-Type-Validierung, maximale Dateigröße konfigurierbar (default: 20 MB)
-- API-Rate-Limiting als optionale Middleware
+- Single-user JWT-Authentifizierung implementiert (httpOnly SameSite=Strict Cookie, optionales `AUTH_PASSWORD`/`AUTH_SECRET_KEY` in `.env`)
+- Statischer API-Key (`API_KEY`) für programmatischen Zugriff (MCP etc.)
+- Security-Header via nginx (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, CSP)
+- Datei-Upload: Magic-Byte-Validierung (python-magic), maximale Dateigröße konfigurierbar (default: 20 MB)
+- Eingabe-Validierung via Pydantic-Constraints auf allen Endpunkten
 
 ### 6.2 Performance
 - Paginierung für Personenliste (default: 50 pro Seite)
@@ -347,38 +348,44 @@ family-tree/
 ## 9. Implementierungs-Phasen (für Agenten-Handoff)
 
 ### Phase 1 – Foundation
-- [ ] Repo-Struktur aufsetzen
-- [ ] Docker Compose (dev + prod)
-- [ ] FastAPI Grundgerüst + Health-Endpoint
-- [ ] PostgreSQL-Anbindung + Alembic-Setup
-- [ ] SQLAlchemy-Modelle: Person, Relationship, Media
+- [x] Repo-Struktur aufsetzen
+- [x] Docker Compose (dev + prod)
+- [x] FastAPI Grundgerüst + Health-Endpoint
+- [x] PostgreSQL-Anbindung + Alembic-Setup
+- [x] SQLAlchemy-Modelle: Person, Relationship, Media
 
 ### Phase 2 – Backend Core
-- [ ] CRUD-Endpunkte für Personen
-- [ ] CRUD-Endpunkte für Beziehungen
-- [ ] Tree-Builder-Service (Graph-Aufbau, Geschwister-Ableitung)
-- [ ] `/tree` und `/tree/{id}` Endpunkte
-- [ ] Media-Upload und -Abruf
+- [x] CRUD-Endpunkte für Personen
+- [x] CRUD-Endpunkte für Beziehungen
+- [x] Tree-Builder-Service (Graph-Aufbau, Geschwister-Ableitung)
+- [x] `/tree` und `/tree/{id}` Endpunkte
+- [x] Media-Upload und -Abruf
 
 ### Phase 3 – Frontend Core
-- [ ] React + Vite + Tailwind Setup
-- [ ] React Query API-Client
-- [ ] PersonList + PersonForm + PersonDetail
-- [ ] Graph-Ansicht (React Flow)
-- [ ] Baum-Ansicht (D3) + Toggle
+- [x] React + Vite + Tailwind Setup
+- [x] React Query API-Client
+- [x] PersonList + PersonForm + PersonDetail
+- [x] Graph-Ansicht (React Flow)
+- [x] Baum-Ansicht (D3) + Toggle
 
 ### Phase 4 – Import/Export
-- [ ] GEDCOM 5.5.5 Parser (Import)
-- [ ] GEDCOM Exporter
-- [ ] JSON Import/Export
-- [ ] PDF-Export (client-side)
+- [x] GEDCOM 5.5.1 Parser (Import)
+- [x] GEDCOM Exporter
+- [x] JSON Import/Export
+- [ ] PDF-Export (client-side) — nicht implementiert
 
 ### Phase 5 – Polish
-- [ ] Dark Mode
-- [ ] Validierung und Fehlerbehandlung (Frontend + Backend)
-- [ ] Thumbnail-Generierung für Fotos (Pillow)
-- [ ] E2E-Tests (Playwright)
-- [ ] Dokumentation (README, API-Docs)
+- [x] Dark Mode
+- [x] Validierung und Fehlerbehandlung (Frontend + Backend)
+- [x] Thumbnail-Generierung für Fotos (Pillow)
+- [ ] E2E-Tests (Playwright) — nicht implementiert
+- [x] Dokumentation (README, API-Docs)
+
+### Phase 6 – Post-MVP (implementiert)
+- [x] JWT-Authentifizierung (httpOnly Cookie)
+- [x] Security-Hardening (Headers, Magic-Byte-Validierung, Input-Constraints)
+- [x] Performance (GZip, DB-Pool, Indexes, Paginierung)
+- [x] AI-Dokumentenextraktion (GPT-4o + MediaPipe Portraiterkennung)
 
 ---
 
@@ -386,7 +393,7 @@ family-tree/
 
 | Thema | Entscheidung | Begründung |
 |---|---|---|
-| Authentifizierung | Kein Auth in v1.0 | Homelab-intern; Stub-Architektur vorbereitet |
+| Authentifizierung | Single-user JWT implementiert | Optional via `AUTH_PASSWORD` in `.env` |
 | DB-Wahl | PostgreSQL (SQLite als Alt.) | Flexibel via `DATABASE_URL` |
 | Graph-Layout-Algorithmus | React Flow Auto-Layout (Dagre) | Erweiterbar auf eigene Layouts |
 | GEDCOM-Version | 5.5.5 (nicht GEDCOM X) | Breiteste Kompatibilität mit bestehender Software |
