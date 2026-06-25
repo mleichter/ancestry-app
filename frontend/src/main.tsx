@@ -5,7 +5,11 @@ import App from './App'
 import './index.css'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,  // 5 minutes — family tree data changes infrequently
+    },
+  },
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

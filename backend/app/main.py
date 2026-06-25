@@ -1,6 +1,7 @@
 import logging
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 import app.models  # noqa: F401 — registers all mappers with SQLAlchemy
 from app.routers import persons, relationships, tree, media, gedcom, ai, auth
 from app.auth import require_auth
@@ -17,6 +18,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
