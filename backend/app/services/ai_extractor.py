@@ -155,6 +155,34 @@ def _crop_portrait(image_bytes: bytes, bbox: list) -> str | None:
         return None
 
 
+def _detect_face_bbox(image_bytes: bytes) -> list[float] | None:
+    """Run MediaPipe BlazeFace on the full image; return [x1%, y1%, x2%, y2%] or None."""
+    try:
+        import mediapipe as mp
+        import numpy as np
+
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            np_rgb = np.array(img.convert("RGB"))
+
+        with mp.solutions.face_detection.FaceDetection(
+            model_selection=1, min_detection_confidence=0.5
+        ) as detector:
+            detections = detector.process(np_rgb).detections
+
+        if not detections:
+            return None
+
+        best = max(detections, key=lambda d: d.score[0])
+        bb = best.location_data.relative_bounding_box
+        x1 = max(0.0, bb.xmin) * 100
+        y1 = max(0.0, bb.ymin) * 100
+        x2 = min(1.0, bb.xmin + bb.width) * 100
+        y2 = min(1.0, bb.ymin + bb.height) * 100
+        return [x1, y1, x2, y2]
+    except Exception:
+        return None
+
+
 def _parse_result(data: dict, image_bytes: bytes) -> ExtractionResult:
     fields_raw = data.get("fields", {})
     fields: dict[str, FieldResult] = {}

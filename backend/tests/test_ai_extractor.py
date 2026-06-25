@@ -147,3 +147,12 @@ async def test_extract_from_document_calls_openai(monkeypatch):
     assert result.document_type == "passport"
     assert result.fields["first_name"].value == "Anna"
     assert mock_create.called
+
+from app.services.ai_extractor import _detect_face_bbox
+
+# ── _detect_face_bbox ─────────────────────────────────────────────────────────
+
+def test_detect_face_bbox_plain_image_returns_none():
+    """A solid-colour image with no face must return None."""
+    result = _detect_face_bbox(_make_image(300, 400))
+    assert result is None
